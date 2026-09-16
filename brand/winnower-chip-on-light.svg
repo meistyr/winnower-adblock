@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="currentColor" role="img" aria-label="winnower">
+  <title>winnower</title>
+  <defs>
+    <clipPath id="wcl-cut"><polygon points="-20,-41.576 120,98.424 120,120 -20,120"/></clipPath><mask id="wcl-vein" maskUnits="userSpaceOnUse" x="-20" y="-20" width="104" height="104"><rect x="-20" y="-20" width="104" height="104" fill="#fff"/><path d="M32 50 L33.5 18" stroke="#000" stroke-width="2.2" stroke-linecap="round"/><path d="M32 6 C48 16 50 38 32 54 C14 38 16 16 32 6 Z" fill="none" stroke="#000" stroke-width="0.6"/></mask>
+    <mask id="wcl-knockout" maskUnits="userSpaceOnUse" x="-20" y="-20" width="104" height="104">
+      <rect x="-20" y="-20" width="104" height="104" fill="#fff"/>
+      <g fill="#000" transform="translate(11.542 6.885) scale(0.788) rotate(45 32 32)"><g clip-path="url(#wcl-cut)"><path d="M32 6 C48 16 50 38 32 54 C14 38 16 16 32 6 Z" mask="url(#wcl-vein)"/></g><path d="M32 53 C31 57 29 60 25.5 62" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/></g>
+    </mask>
+  </defs>
+  <g transform="rotate(-10.957 32 32)">
+    <rect x="8" y="10.02" width="48" height="43.96" rx="11" mask="url(#wcl-knockout)"/>
+  </g>
+</svg>

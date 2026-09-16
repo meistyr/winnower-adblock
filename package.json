@@ -1,0 +1,47 @@
+{
+  "name": "winnower",
+  "version": "0.1.0",
+  "description": "A self-hosted Manifest V3 content blocker for Chromium browsers.",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://winnower.meistyr.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meistyr/winnower-adblock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/meistyr/winnower-adblock/issues"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/tsconfig.json",
+    "fetch": "node build/fetch-lists.ts",
+    "convert": "node build/convert-network.ts",
+    "popup": "node build/convert-popup.ts",
+    "cosmetic": "node build/convert-cosmetic.ts",
+    "scriptlets": "node build/build-scriptlets.ts",
+    "compile": "node build/compile.ts",
+    "static": "node build/copy-static.ts",
+    "manifest": "node build/write-manifest.ts",
+    "validate": "node build/validate.ts",
+    "package": "node build/package.ts",
+    "update": "npm run typecheck && npm run fetch && npm run convert && npm run popup && npm run cosmetic && npm run scriptlets && npm run compile && npm run static && npm run manifest && npm run validate",
+    "brand": "node brand/build.ts"
+  },
+  "devDependencies": {
+    "@adguard/dnr-converter": "^1.1.2",
+    "@ghostery/adblocker": "^2.18.2",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/chrome": "^0.3.0",
+    "@types/fontkit": "^2.0.9",
+    "@types/node": "^22.20.3",
+    "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
+    "fontkit": "^2.0.4",
+    "geist": "^1.7.2",
+    "typescript": "^7.0.2"
+  }
+}

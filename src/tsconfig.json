@@ -1,0 +1,21 @@
+{
+  // Extension side: runs in Chrome. DOM and chrome.* types, no Node types, so a
+  // Node API used here fails the type check instead of failing in the browser.
+  // esbuild bundles these (build/compile.ts); this config only type-checks.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["chrome"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["./**/*.ts"]
+}

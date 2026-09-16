@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>winnower</title>
+<style>
+  :root {
+    --bg: #0f1310;
+    --surface: #181c19;
+    --surface-2: #202421;
+    --line: #292e29;
+    --scroll-thumb: #424742;
+    --text: #ececec;
+    --muted: #8b8b8b;
+    --faint: #5c5c5c;
+    --on: #7bd88f;
+    --on-dim: rgba(123, 216, 143, 0.14);
+    --off: #e0795f;
+    --off-dim: rgba(224, 121, 95, 0.14);
+    --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+    --sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  /* Scrollbar in the popup's own colours. color-scheme covers anything the two
+     standard properties don't; both need Chrome 121, the manifest's minimum. */
+  html {
+    color-scheme: dark;
+    scrollbar-color: var(--scroll-thumb) var(--bg);
+    scrollbar-width: thin;
+  }
+  body {
+    width: 336px;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.4 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Stays put while the popup scrolls. Needs its own background, or the content
+     scrolling underneath shows through, and a z-index above the switches'
+     positioned inputs (z-index 1), which would otherwise paint over it. */
+  header {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 13px 16px 11px;
+    border-bottom: 1px solid var(--line);
+  }
+  /* The lockup from brand/, generated with this palette baked in (npm run brand). */
+  .mark { display: block; height: 16px; width: auto; flex: none; }
+  .host {
+    font: 12px var(--mono); color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px;
+  }
+
+  section { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+  h2 {
+    margin: 0 0 8px; font: 600 10.5px var(--sans); letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint);
+  }
+
+  /* site card */
+  .site {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px; border-radius: 10px; background: var(--surface);
+    border: 1px solid var(--line); transition: background 140ms, border-color 140ms;
+  }
+  .site.is-on  { background: var(--on-dim);  border-color: rgba(123, 216, 143, 0.28); }
+  .site.is-off { background: var(--off-dim); border-color: rgba(224, 121, 95, 0.28); }
+  .site-label { font-weight: 600; }
+  .site-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stat { padding: 9px 11px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+  .stat b { display: block; font: 600 18px var(--mono); font-variant-numeric: tabular-nums; }
+  .stat small { color: var(--muted); font-size: 11px; }
+
+  /* rows */
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 6px 0;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-label { display: flex; flex-direction: column; min-width: 0; }
+  .row-note { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* diagnostics */
+  .diag { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12px; }
+  .diag dt { color: var(--muted); }
+  .diag dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .ok   { color: var(--on); }
+  .warn { color: var(--off); }
+  .na   { color: var(--faint); }
+
+  /* switch */
+  .switch { position: relative; width: 36px; height: 20px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .track {
+    position: absolute; inset: 0; border-radius: 999px; background: var(--surface-2);
+    border: 1px solid var(--line); transition: background 140ms, border-color 140ms;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--muted); transition: transform 160ms, background 140ms;
+  }
+  .switch input:checked + .track { background: var(--on); border-color: var(--on); }
+  .switch input:checked + .track::after { transform: translateX(16px); background: #0f1a12; }
+  .switch input:focus-visible + .track { outline: 2px solid var(--on); outline-offset: 2px; }
+  .switch input:disabled { cursor: not-allowed; }
+  .switch input:disabled + .track { opacity: 0.4; }
+
+  .foot { display: flex; align-items: center; justify-content: space-between; }
+  .foot .row-note { white-space: normal; }
+
+  /* Copyright and licence on the left, version on the right. --muted rather than
+     --faint: faint is 2.8:1 on the background, too low for text worth reading. */
+  .site-footer {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 10px 16px 12px; border-top: 1px solid var(--line);
+    font: 11px var(--mono); color: var(--muted);
+  }
+  .site-footer a { color: inherit; text-decoration: none; }
+  .site-footer a:hover { color: var(--text); text-decoration: underline; }
+  .site-footer a:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; border-radius: 2px; }
+  .site-footer .version { font-variant-numeric: tabular-nums; }
+
+  .banner {
+    margin: 12px 16px 0; padding: 8px 10px; border-radius: 8px; font-size: 12px;
+    background: var(--off-dim); color: var(--off); border: 1px solid rgba(224, 121, 95, 0.28);
+  }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <header>
+    <img class="mark" src="icons/lockup-popup.svg" alt="winnower" height="16">
+    <div class="host" id="host">—</div>
+  </header>
+
+  <div class="banner" id="master-banner" hidden>Blocking is paused everywhere.</div>
+
+  <section>
+    <div class="site" id="site-card">
+      <div>
+        <div class="site-label" id="site-label">Blocking on this site</div>
+        <div class="site-sub" id="site-sub">Ads, trackers and popups</div>
+      </div>
+      <label class="switch" title="Toggle blocking on this site">
+        <input type="checkbox" id="site-toggle" aria-label="Blocking on this site">
+        <span class="track"></span>
+      </label>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="stat-blocked">0</b><small>blocked on this tab</small></div>
+      <div class="stat"><b id="stat-rules">—</b><small>rules active</small></div>
+    </div>
+    <div class="hint" id="reload-hint" hidden>Reloading the page to apply…</div>
+  </section>
+
+  <section>
+    <h2>Filter lists</h2>
+    <div id="groups"></div>
+  </section>
+
+  <section>
+    <h2>On this page</h2>
+    <dl class="diag" id="diag">
+      <dt>Cosmetic rules</dt>    <dd id="d-cosmetic" class="na">—</dd>
+      <dt>Wrappers collapsed</dt><dd id="d-collapsed" class="na">—</dd>
+      <dt>YouTube</dt><dd id="d-scriptlets" class="na">—</dd>
+      <dt>Popups blocked</dt>    <dd id="d-popups" class="na">—</dd>
+    </dl>
+  </section>
+
+  <section class="foot">
+    <div class="row-label">
+      <span class="site-label">Master switch</span>
+      <span class="row-note">Pause winnower on every site</span>
+    </div>
+    <label class="switch" title="Pause or resume winnower everywhere">
+      <input type="checkbox" id="master-toggle" aria-label="Master switch">
+      <span class="track"></span>
+    </label>
+  </section>
+
+  <!-- The GPL asks an interactive program to show its copyright, that there is no
+       warranty, and where to read the licence; LICENSE.txt carries the last two. -->
+  <footer class="site-footer">
+    <span>&copy; 2026 <a href="https://meistyr.tech" target="_blank" rel="noopener">meistyr.tech</a> &middot; <a href="LICENSE.txt" target="_blank" title="GNU GPL v3.0 or later, with no warranty. Opens the licence.">GPL-3.0</a></span>
+    <span class="version" id="version"></span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

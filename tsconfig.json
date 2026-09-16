@@ -1,0 +1,22 @@
+{
+  // Node side: build/, brand/, and the shared modules they import from src/shared/.
+  // Nothing is emitted. Node runs these .ts files directly by stripping the types,
+  // which is why only erasable syntax is allowed (no enum, namespace or
+  // parameter properties) and imports carry their .ts extension.
+  // The extension code has its own config in src/tsconfig.json.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "moduleDetection": "force",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["build/**/*.ts", "brand/**/*.ts", "src/shared/**/*.ts"]
+}

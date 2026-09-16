@@ -1,0 +1,64 @@
+# Build winnower and publish winnower.zip when a version tag is pushed.
+#
+#   npm version X.Y.Z --no-git-tag-version, add the CHANGELOG.md entry, commit,
+#   then: git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# The filter lists are fetched fresh here, so every release ships current filters.
+# The asset is always named winnower.zip, which keeps
+# releases/latest/download/winnower.zip a permanent link for the website.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22 # 22.18+ runs the build scripts' TypeScript directly
+          cache: npm
+
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no entry for $version"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Build (typecheck, fetch lists, convert, compile, validate)
+        run: npm run update
+
+      - run: npm run package
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" winnower.zip
+          --title "winnower $GITHUB_REF_NAME"
+          --notes-file release-notes.md
+          --verify-tag
