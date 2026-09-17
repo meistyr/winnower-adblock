@@ -1,0 +1,47 @@
+name: A site breaks with winnower on
+description: A page doesn't load or work properly while winnower is on.
+title: "Site broken: "
+labels: ["report:site-broken"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting it. The page's address and what goes wrong are what I need most.
+  - type: input
+    id: address
+    attributes:
+      label: Page address
+      placeholder: https://example.com/page
+    validations:
+      required: true
+  - type: textarea
+    id: what-goes-wrong
+    attributes:
+      label: What goes wrong
+      description: What you expected to happen, and what happens instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: paused
+    attributes:
+      label: Does pausing winnower on this site fix it?
+      description: Open winnower's menu from the toolbar, switch off blocking on this site, and reload the page.
+      options:
+        - Yes, it works with winnower paused
+        - No, it's still broken
+        - I haven't tried
+    validations:
+      required: true
+  - type: input
+    id: winnower-version
+    attributes:
+      label: winnower version
+      description: Shown at the bottom of winnower's menu.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      description: From chrome://settings/help, or your browser's About page.
+      placeholder: Chrome 152

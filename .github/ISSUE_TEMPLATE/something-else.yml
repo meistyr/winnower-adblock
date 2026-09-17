@@ -1,0 +1,30 @@
+name: Something else isn't working
+description: A problem with winnower itself, such as its menu, its switches or installing it.
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what-goes-wrong
+    attributes:
+      label: What goes wrong
+      description: What you expected to happen, and what happens instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps that lead to the problem, if you know them.
+  - type: input
+    id: winnower-version
+    attributes:
+      label: winnower version
+      description: Shown at the bottom of winnower's menu.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      description: From chrome://settings/help, or your browser's About page.
+      placeholder: Chrome 152

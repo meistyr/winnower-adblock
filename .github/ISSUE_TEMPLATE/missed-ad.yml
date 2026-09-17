@@ -1,0 +1,50 @@
+name: An ad got through
+description: An ad, tracker or popup that winnower didn't block.
+title: "Missed ad: "
+labels: ["report:missed-ad"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting it. The page's address and where the ad appears are what I need most.
+  - type: input
+    id: address
+    attributes:
+      label: Page address
+      placeholder: https://example.com/page
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where the ad appears
+      description: Where on the page it shows, and what it looks like. A screenshot helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: lists
+    attributes:
+      label: Have you changed which filter lists are on?
+      options:
+        - No, they're as winnower installed them
+        - Yes (say which below)
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Which lists you changed, or anything else that might help.
+  - type: input
+    id: winnower-version
+    attributes:
+      label: winnower version
+      description: Shown at the bottom of winnower's menu.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      description: From chrome://settings/help, or your browser's About page.
+      placeholder: Chrome 152

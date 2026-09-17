@@ -5,12 +5,17 @@ as time allows.
 
 ## Reporting a problem
 
-- **A site breaks with winnower on:** open an issue with the page's address, what goes wrong,
-  and whether pausing winnower on that site (from the toolbar popup) fixes it.
-- **An ad gets through:** open an issue with the page's address and where the ad appears.
+[Open an issue](https://github.com/meistyr/winnower-adblock/issues/new/choose) and pick the form
+that fits:
+
+- **A site breaks with winnower on:** the page's address, what goes wrong, and whether pausing
+  winnower on that site (from winnower's menu in the toolbar) fixes it.
+- **An ad got through:** the page's address and where the ad appears.
+- **Something else isn't working:** what goes wrong, and how to make it happen.
 - **A security problem:** please don't open an issue. See [SECURITY.md](SECURITY.md).
 
-Include your Chrome version and your winnower version, which is shown at the bottom of the popup.
+Each form asks for your browser version and your winnower version, which is shown at the bottom
+of winnower's menu.
 
 ## Pull requests
 
@@ -46,7 +51,7 @@ their settings are lost.
 [Conventional Commits](https://www.conventionalcommits.org): `type(scope): summary`. The summary
 is in the imperative, lowercase, with no trailing period.
 
-Scopes: `filters`, `youtube`, `popup`, `build`, `brand`, `deps`, `ci`, `release`.
+Scopes: `filters`, `youtube`, `popup` (winnower's menu), `build`, `brand`, `deps`, `ci`, `release`.
 
 ```
 fix(filters): stop hiding the comment box on news sites
@@ -75,7 +80,7 @@ people reading the code.
 | Label | Meaning |
 | --- | --- |
 | `type:bug` `type:feature` `type:chore` `type:docs` | What kind of work it is |
-| `area:filters` `area:youtube` `area:popup` `area:build` `area:brand` | Which part of winnower |
+| `area:filters` `area:youtube` `area:popup` `area:build` `area:brand` | Which part of winnower (`popup` is winnower's menu) |
 | `report:site-broken` `report:missed-ad` | Reports from people using winnower |
 | `blocked:luke` | Waiting on a decision, a credential or an approval |
 | `ready` | Decided and ready to build |

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/meistyr/winnower-adblock/security/advisories/new
+    about: Please report vulnerabilities privately, not in a public issue.
+  - name: Questions about installing and using winnower
+    url: https://winnower.meistyr.tech/faq
+    about: The most common questions are answered in the FAQ.
