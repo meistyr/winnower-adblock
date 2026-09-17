@@ -9,6 +9,7 @@ All notable changes to winnower are documented here. The format follows
 ### Changed
 
 - **Toolbar icon:** now the leaf on its own, without the rounded tile around it.
+- **Toolbar menu:** the logo at the top is a little larger.
 
 ## [0.1.0] - 2026-09-16
 

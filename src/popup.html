@@ -44,11 +44,12 @@
     position: sticky; top: 0; z-index: 2;
     background: var(--bg);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 13px 16px 11px;
+    padding: 11px 16px 9px;
     border-bottom: 1px solid var(--line);
   }
-  /* The lockup from brand/, generated with this palette baked in (npm run brand). */
-  .mark { display: block; height: 16px; width: auto; flex: none; }
+  /* The lockup from brand/, generated with this palette baked in (npm run brand), at the
+     lockup's 20px minimum size (brand/README.md). */
+  .mark { display: block; height: 20px; width: auto; flex: none; }
   .host {
     font: 12px var(--mono); color: var(--muted);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px;
@@ -136,7 +137,7 @@
 </head>
 <body>
   <header>
-    <img class="mark" src="icons/lockup-popup.svg" alt="winnower" height="16">
+    <img class="mark" src="icons/lockup-popup.svg" alt="winnower" height="20">
     <div class="host" id="host">—</div>
   </header>
 
