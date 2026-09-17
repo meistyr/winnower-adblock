@@ -27,6 +27,8 @@ const manifest = {
   name: 'winnower',
   version,
   description: 'A free, open-source content blocker. Every page in its final shape.',
+  // The website link on winnower's details page in chrome://extensions.
+  homepage_url: 'https://winnower.meistyr.tech',
   minimum_chrome_version: '121',
 
   permissions: [

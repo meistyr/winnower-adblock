@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://winnower.meistyr.tech">Website</a> ·
   <a href="https://github.com/meistyr/winnower-adblock/releases/latest/download/winnower.zip">Download</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>

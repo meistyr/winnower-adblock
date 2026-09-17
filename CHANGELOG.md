@@ -6,6 +6,11 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Website:** winnower's details page in `chrome://extensions` links to
+  [winnower.meistyr.tech](https://winnower.meistyr.tech).
+
 ### Changed
 
 - **Toolbar icon:** now the leaf on its own, without the rounded tile around it.
