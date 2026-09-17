@@ -13,6 +13,12 @@ All notable changes to winnower are documented here. The format follows
 - **Description:** the line under winnower's name in `chrome://extensions` now reads "A free, open-source content
   blocker. Every page in its final shape."
 
+### Fixed
+
+- **Sign-in and share windows:** windows a site opens to sign you in with Google are no longer blocked, and neither
+  are the ones it opens to Facebook, bit.ly, t.co, Adobe and about 100 other sites. Popup blocking was treating a
+  filter meant for one address on a site as a block on the whole site.
+
 ## [0.1.0] - 2026-09-16
 
 First release.

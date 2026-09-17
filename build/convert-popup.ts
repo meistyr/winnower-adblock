@@ -138,15 +138,41 @@ async function main() {
 
   await writeFile(OUT, JSON.stringify(rules), 'utf8');
 
-  // Patterns for the window.open guard — the JS-driven popunders never produce
+  // Hosts for the window.open guard — the JS-driven popunders never produce
   // a blockable navigation, because the page calls window.open() itself.
+  //
+  // The guard has only the host to go on, on every site, so it takes only
+  // filters that block a whole host everywhere: ||popads.net^$popup. A filter
+  // narrowed to a path (||google.com/favicon.ico) or to some sites
+  // (domain=instagram.com) would block the whole host on every site in the
+  // guard. 0.1.0 did exactly that, and refused every script-opened window to
+  // google.com, Google sign-in included. Those filters stay DNR-only above,
+  // where their conditions survive.
+  //
+  // Exceptions follow the same shape: one for a whole host everywhere
+  // (@@||accounts.google.com^$popup) goes on the allow list. A narrowed one,
+  // such as a single click-through path on doubleclick.net, can't be expressed
+  // by host, and allowing the whole host for it would let that network's
+  // popunders through, so the guard keeps refusing that host.
+  const WHOLE_HOST = /^\|\|([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?:\^\|?)?$/i;
   const hosts = new Set<string>();
+  const thirdPartyHosts = new Set<string>();
+  const allowHosts = new Set<string>();
+  let narrowed = 0;
   for (const p of parsed) {
-    if (p.isException) continue;
-    const m = /^\|\|([a-z0-9.*-]+)\^?/i.exec(p.pattern);
-    if (m && !m[1].includes('*')) hosts.add(m[1]);
+    const m = WHOLE_HOST.exec(p.pattern);
+    const everywhere = p.domains.length === 0 && p.excludedDomains.length === 0;
+    if (!m || !everywhere) {
+      if (!p.isException && p.pattern.startsWith('||')) narrowed += 1;
+      continue;
+    }
+    const host = m[1].toLowerCase();
+    if (p.isException) allowHosts.add(host);
+    else (p.thirdParty ? thirdPartyHosts : hosts).add(host);
   }
-  await writeFile(PATTERNS_OUT, JSON.stringify({ hosts: [...hosts] } satisfies PopupPatterns), 'utf8');
+  for (const h of hosts) thirdPartyHosts.delete(h); // blocked everywhere already
+  const patterns: PopupPatterns = { hosts: [...hosts], thirdParty: [...thirdPartyHosts], allow: [...allowHosts] };
+  await writeFile(PATTERNS_OUT, JSON.stringify(patterns), 'utf8');
 
   // The window.open guard itself is src/popup-guard.ts. build/compile.ts bakes
   // these hosts into it, because it runs in the MAIN world with no chrome.runtime
@@ -159,7 +185,8 @@ async function main() {
   console.log(`  badfilter/unparsed     ${String(badfilter).padStart(7)}`);
   console.log(`  refused (unsafe)       ${String(refused).padStart(7)}   bare pattern with no initiator, or wildcard-only domains`);
   console.log(`  DNR rules emitted      ${String(rules.length).padStart(7)}   ${blocks} block / ${allows} allow`);
-  console.log(`  window.open hosts      ${String(hosts.size).padStart(7)}`);
+  console.log(`  window.open hosts      ${String(hosts.size).padStart(7)}   + ${thirdPartyHosts.size} third-party only, ${allowHosts.size} excepted`);
+  console.log(`  left to DNR alone      ${String(narrowed).padStart(7)}   narrowed to a path or to some sites`);
   console.log('');
 
   if (rules.length === 0) {
@@ -167,7 +194,7 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(`✓ popup: ${rules.length} DNR rules, ${hosts.size} window.open hosts`);
+  console.log(`✓ popup: ${rules.length} DNR rules, ${hosts.size + thirdPartyHosts.size} window.open hosts`);
 }
 
 await main();

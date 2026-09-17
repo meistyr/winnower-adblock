@@ -48,5 +48,10 @@ export interface BuildStats {
 
 /** popup-patterns.json (build/convert-popup.ts → build/compile.ts → popup guard). */
 export interface PopupPatterns {
+  /** Hosts whose windows are refused on every site. */
   hosts: string[];
+  /** Hosts whose windows are refused except on their own site ($popup,third-party). */
+  thirdParty: string[];
+  /** Hosts a whole-host $popup exception names. The guard never refuses these; the DNR rules decide. */
+  allow: string[];
 }

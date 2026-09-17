@@ -28,8 +28,8 @@ const EXT_DIR = new URL('../extension/', import.meta.url);
 
 const ENTRIES = ['sw', 'popup', 'cosmetic', 'offscreen', 'popup-guard'] as const;
 
-// The popup guard's host list is baked in at compile time. It runs in the MAIN
-// world, where there is no chrome.runtime to fetch it with.
+// The popup guard's host lists are baked in at compile time. It runs in the MAIN
+// world, where there is no chrome.runtime to fetch them with.
 let patterns: PopupPatterns;
 try {
   patterns = JSON.parse(await readFile(new URL('popup-patterns.json', EXT_DIR), 'utf8')) as PopupPatterns;
@@ -37,7 +37,11 @@ try {
   console.error('! extension/popup-patterns.json is missing. Run `npm run popup` first.');
   process.exit(1);
 }
-if (!Array.isArray(patterns.hosts) || patterns.hosts.length === 0) {
+if (![patterns.hosts, patterns.thirdParty, patterns.allow].every(Array.isArray)) {
+  console.error('! extension/popup-patterns.json is from an older build. Run `npm run popup` again.');
+  process.exit(1);
+}
+if (patterns.hosts.length === 0) {
   console.error('! extension/popup-patterns.json has no hosts; the popup guard would block nothing.');
   process.exit(1);
 }
@@ -54,7 +58,7 @@ const result = await build({
   sourcemap: false,
   charset: 'utf8',
   banner: { js: '/* winnower — generated from src/ by build/compile.ts. Do not edit. */\n"use strict";' },
-  define: { POPUP_HOSTS: JSON.stringify(patterns.hosts) },
+  define: { POPUP_PATTERNS: JSON.stringify(patterns) },
   metafile: true,
   logLevel: 'warning',
 });
@@ -63,4 +67,4 @@ if (result.errors.length) process.exit(1);
 for (const [file, out] of Object.entries(result.metafile.outputs)) {
   console.log(`  ${file.replace(/^.*extension[\/]/, '').padEnd(18)} ${String(Math.round(out.bytes / 1024)).padStart(4)} KB`);
 }
-console.log(`\u2713 compiled ${ENTRIES.length} entry points into extension/ (popup guard: ${patterns.hosts.length.toLocaleString()} hosts)`);
+console.log(`\u2713 compiled ${ENTRIES.length} entry points into extension/ (popup guard: ${(patterns.hosts.length + patterns.thirdParty.length).toLocaleString()} hosts)`);

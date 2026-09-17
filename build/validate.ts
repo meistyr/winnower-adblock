@@ -7,7 +7,9 @@
  * prints no errors is not evidence. This asserts positive facts instead.
  */
 import { readFile, readdir } from 'node:fs/promises';
+import type { PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY } from '../src/shared/constants.ts';
+import { createPopupMatcher } from '../src/shared/popup-match.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
@@ -120,6 +122,23 @@ if (maxStaticPriority >= ALLOWLIST_PRIORITY) {
       `It would keep firing on allowlisted sites. Raise ALLOWLIST_PRIORITY in src/shared/constants.ts.`,
   );
 }
+// The popup guard refuses window.open by host alone, on every site, so one wrong
+// host breaks that site's sign-in and share windows everywhere. 0.1.0 refused
+// every script-opened google.com window, Google sign-in included. These hosts
+// sign people in, so the guard must always let them open.
+const SIGN_IN_HOSTS = [
+  'accounts.google.com', 'appleid.apple.com', 'login.microsoftonline.com', 'login.live.com',
+  'www.facebook.com', 'github.com', 'discord.com',
+];
+const popupPatterns = JSON.parse(await readFile(new URL('popup-patterns.json', EXT_DIR), 'utf8')) as PopupPatterns;
+const guardRefuses = createPopupMatcher(popupPatterns);
+const refusedSignIns = SIGN_IN_HOSTS.filter((host) => guardRefuses(host, 'news.example'));
+const refusedOwn = popupPatterns.hosts.filter((host) => guardRefuses(host, 'news.example')).length;
+console.log(`  popup guard refuses ${refusedOwn.toLocaleString()} / ${popupPatterns.hosts.length.toLocaleString()} of its hosts, ${refusedSignIns.length} / ${SIGN_IN_HOSTS.length} sign-in hosts`);
+console.log('');
+for (const host of refusedSignIns) problems.push(`the popup guard refuses windows to ${host}, a sign-in host. Find the $popup filter naming it.`);
+if (refusedOwn === 0) problems.push('the popup guard refuses none of its own hosts');
+
 if (totalRegexp > MAX_REGEXP_RULES) problems.push(`${totalRegexp} regexp rules exceeds the hard cap of ${MAX_REGEXP_RULES}`);
 if (totalRules === 0) problems.push('zero rules across all rulesets');
 
