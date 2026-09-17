@@ -26,7 +26,7 @@ const manifest = {
   manifest_version: 3,
   name: 'winnower',
   version,
-  description: 'A self-hosted content blocker. Separates the grain from the chaff.',
+  description: 'A free, open-source content blocker. Every page in its final shape.',
   minimum_chrome_version: '121',
 
   permissions: [

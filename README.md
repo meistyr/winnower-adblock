@@ -7,7 +7,7 @@
 
 <p align="center">
   A free, open-source content blocker for Chrome and other Chromium browsers.<br>
-  Separates the grain from the chaff.
+  Every page in its final shape.
 </p>
 
 <p align="center">

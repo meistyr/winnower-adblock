@@ -10,6 +10,8 @@ All notable changes to winnower are documented here. The format follows
 
 - **Toolbar icon:** now the leaf on its own, without the rounded tile around it.
 - **Toolbar menu:** the logo at the top is a little larger, and the section labels and notes are easier to read.
+- **Description:** the line under winnower's name in `chrome://extensions` now reads "A free, open-source content
+  blocker. Every page in its final shape."
 
 ## [0.1.0] - 2026-09-16
 
