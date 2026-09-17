@@ -5,9 +5,8 @@
  *
  * Writes, for light and for dark backgrounds:
  *   brand/winnower-mark-on-{light,dark}.svg     bare leaf
- *   brand/winnower-chip-on-{light,dark}.svg     leaf cut out of the turned tile
  *   brand/winnower-lockup-on-{light,dark}.svg   leaf + outlined wordmark
- *   brand/icons/chip-on-{light,dark}-{16,32,48,128}.png   toolbar icons
+ *   brand/icons/mark-on-{light,dark}-{16,32,48,128}.png   toolbar icons
  *   brand/icons/lockup-popup.svg                          popup header logo
  *   brand/readme/lockup-on-{light,dark}.svg               README logo, ink baked in
  *
@@ -23,17 +22,13 @@
  *      reaches the same distance above the letters as below the baseline.
  *   4. Lockup spacing: the gap between the cut and the w equals the gap the
  *      "o" keeps from the second "w" — the letters' own spacing.
- *   5. Chip: a rounded tile turned 10.96° so its right side is parallel to the
- *      cut. In the tile's frame the leaf sits at exactly 45°.
- *   6. Chip spacing: equal gaps on all four sides. The leaf is wider than it is
- *      tall at 45°, so the tile is slightly wider than tall to allow it.
- *   7. Colour: monochrome marks; the underscore is the popup's "on" green.
- *   8. Reversed weights (judged by eye): a leaf drawn
+ *   5. Colour: monochrome marks; the underscore is the popup's "on" green.
+ *   6. Reversed weights (judged by eye): a leaf drawn
  *      light on dark looks heavier than the same leaf dark on light
  *      (irradiation), so wherever the leaf itself is light it is drawn thinner.
- *   9. 16px: the vein goes and the stem is held at one pixel.
- *  10. Toolbar icons are cropped to the tile's own edges so it fills the icon
- *      like other extensions' icons do (ICON_VIEW).
+ *   7. 16px: the vein goes and the stem is held at one pixel.
+ *   8. Toolbar icons are the bare leaf, cropped to its own ink so it fills the
+ *      icon like other extensions' icons do (ICON_VIEW).
  */
 import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -247,63 +242,25 @@ function markSvg(w: Weights, ns: string): string {
 `;
 }
 
-// --- 5 + 6. chip ------------------------------------------------------------------
-
-const TILE = { x: 8, w: 48, rx: 11, margin: 7 };
-const TURN = -(90 - EDGE_ANGLE); // ≈-10.96
-const LEAF_IN_TILE = TILT - TURN; // exactly 45° by construction
-
-const CHIP = (() => {
-  const ink = leafInk().pts.map((p) => rot(p, LEAF_IN_TILE));
-  const bb = bboxOf(ink);
-  const s = (TILE.w - 2 * TILE.margin) / (bb.maxX - bb.minX);
-  const tileH = s * (bb.maxY - bb.minY) + 2 * TILE.margin;
-  const tileY = 32 - tileH / 2;
-  const tx = TILE.x + TILE.margin - s * bb.minX;
-  const ty = tileY + TILE.margin - s * bb.minY;
-  const placed = ink.map((p) => ({ x: tx + s * p.x, y: ty + s * p.y }));
-  const gaps = {
-    top: Math.min(...placed.map((p) => p.y)) - tileY,
-    right: TILE.x + TILE.w - Math.max(...placed.map((p) => p.x)),
-    bottom: tileY + tileH - Math.max(...placed.map((p) => p.y)),
-    left: Math.min(...placed.map((p) => p.x)) - TILE.x,
-  };
-  return { s, tx, ty, tileY, tileH, gaps };
-})();
+// --- toolbar icon crop ------------------------------------------------------------
 
 /**
- * Toolbar icons are cropped to the turned tile itself, so it fills the icon like
- * other extensions' do instead of sitting in the SVG's 64 grid margin. Measured on
- * the rounded outline: each corner reaches exactly one radius past its arc centre.
- * The crop is square and centred, so the tile touches the edges along its longer side.
+ * Toolbar icons are the bare leaf cropped to its own ink, so it fills the icon like
+ * other extensions' do instead of sitting in the SVG's 64 grid margin. BARE centres
+ * the ink and scales its longer side to 54, so the crop is that centred square: the
+ * leaf touches the icon's edges along its longer side.
  */
 const ICON_VIEW = (() => {
-  const r = TILE.rx, top = CHIP.tileY, bottom = CHIP.tileY + CHIP.tileH;
-  const centres = [[TILE.x + r, top + r], [TILE.x + TILE.w - r, top + r], [TILE.x + r, bottom - r], [TILE.x + TILE.w - r, bottom - r]]
-    .map(([x, y]) => rot({ x, y }, TURN));
-  const minX = Math.min(...centres.map((c) => c.x)) - r, maxX = Math.max(...centres.map((c) => c.x)) + r;
-  const minY = Math.min(...centres.map((c) => c.y)) - r, maxY = Math.max(...centres.map((c) => c.y)) + r;
-  const side = Math.max(maxX - minX, maxY - minY);
-  const x = (minX + maxX) / 2 - side / 2, y = (minY + maxY) / 2 - side / 2;
-  return { x, y, side, w: maxX - minX, h: maxY - minY, box: `${f3(x)} ${f3(y)} ${f3(side)} ${f3(side)}` };
+  const side = 54;
+  const x = 32 - side / 2, y = 32 - side / 2;
+  return { x, y, side, box: `${f3(x)} ${f3(y)} ${f3(side)} ${f3(side)}` };
 })();
 
-function chipSvg(w: Weights, ns: string, viewBox = '0 0 64 64'): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="currentColor" role="img" aria-label="winnower">
-  <title>winnower</title>
-  <defs>
-    ${leafDefs(ns, w)}
-    <mask id="${ns}-knockout" maskUnits="userSpaceOnUse" x="-20" y="-20" width="104" height="104">
-      <rect x="-20" y="-20" width="104" height="104" fill="#fff"/>
-      <g fill="#000" transform="translate(${f3(CHIP.tx)} ${f3(CHIP.ty)}) scale(${f3(CHIP.s)}) rotate(${f3(LEAF_IN_TILE)} 32 32)">${leafMarkup(ns, w, '#000')}</g>
-    </mask>
-  </defs>
-  <g transform="rotate(${f3(TURN)} 32 32)">
-    <rect x="${TILE.x}" y="${f3(CHIP.tileY)}" width="${TILE.w}" height="${f3(CHIP.tileH)}" rx="${TILE.rx}" mask="url(#${ns}-knockout)"/>
-  </g>
-</svg>
-`;
-}
+/** A point in the leaf's own 64 grid, where it lands in the bare mark. */
+const placeBare = (p: Pt): Pt => {
+  const r = rot(p, TILT);
+  return { x: BARE.tx + BARE.s * r.x, y: BARE.ty + BARE.s * r.y };
+};
 
 // --- 2 + 3 + 4. lockup ------------------------------------------------------------
 
@@ -366,12 +323,10 @@ function lockupSvg(w: Weights, ns: string): string {
 // --- write -------------------------------------------------------------------------
 
 // "on-light" / "on-dark" names the background. The leaf is light where it is drawn
-// in light ink (bare and lockup on dark) or cut out of a dark tile (chip on light).
+// in light ink: bare and lockup on dark.
 const FILES = {
   'winnower-mark-on-light.svg': markSvg(REGULAR, 'wml'),
   'winnower-mark-on-dark.svg': markSvg(REVERSED, 'wmd'),
-  'winnower-chip-on-light.svg': chipSvg(REVERSED, 'wcl'),
-  'winnower-chip-on-dark.svg': chipSvg(REGULAR, 'wcd'),
   'winnower-lockup-on-light.svg': lockupSvg(REGULAR, 'wll'),
   'winnower-lockup-on-dark.svg': lockupSvg(REVERSED, 'wld'),
 };
@@ -380,33 +335,30 @@ for (const [name, svg] of Object.entries(FILES)) await writeFile(new URL(name, O
 // Toolbar icons. A PNG has no currentColor, so the ink is baked in from the popup palette.
 const ICON_SIZES = [16, 32, 48, 128];
 const ICONS: Array<{ ground: 'light' | 'dark'; ink: string; weights: Weights }> = [
-  { ground: 'light', ink: INK_DARK, weights: REVERSED },
-  { ground: 'dark', ink: INK_LIGHT, weights: REGULAR },
+  { ground: 'light', ink: INK_DARK, weights: REGULAR },
+  { ground: 'dark', ink: INK_LIGHT, weights: REVERSED },
 ];
 await mkdir(ICON_OUT, { recursive: true });
-const iconReport: Array<{ name: string; bytes: number; tile: number; leaf: number; edgeL: number; edgeR: number }> = [];
+const iconReport: Array<{ name: string; bytes: number; blade: number; fills: boolean }> = [];
 for (const icon of ICONS) {
   for (const size of ICON_SIZES) {
-    const w = size === 16 ? at16(icon.weights, CHIP.s, ICON_VIEW.side / 16) : icon.weights;
-    const svg = chipSvg(w, `i${size}`, ICON_VIEW.box).replaceAll('currentColor', icon.ink);
+    const w = size === 16 ? at16(icon.weights, BARE.s, ICON_VIEW.side / 16) : icon.weights;
+    const svg = markSvg(w, `i${size}`).replace('viewBox="0 0 64 64"', `viewBox="${ICON_VIEW.box}"`).replaceAll('currentColor', icon.ink);
     const png = new Resvg(svg, { fitTo: { mode: 'width', value: size } }).render();
     const bytes = png.asPng();
-    await writeFile(new URL(`chip-on-${icon.ground}-${size}.png`, ICON_OUT), bytes);
-    // Positive check: the tile is opaque ink at a point on the tile, and the leaf is
-    // transparent at a point inside the blade — a broken mask fails one or the other.
+    const name = `mark-on-${icon.ground}-${size}.png`;
+    await writeFile(new URL(name, ICON_OUT), bytes);
     const px = png.pixels; // RGBA
-    // Grid point → pixel alpha, through the icon crop.
-    const at = (x: number, y: number) => {
-      const pxX = Math.min(size - 1, Math.floor(((x - ICON_VIEW.x) * size) / ICON_VIEW.side));
-      const pxY = Math.min(size - 1, Math.floor(((y - ICON_VIEW.y) * size) / ICON_VIEW.side));
-      return px[(pxY * size + pxX) * 4 + 3];
-    };
-    // Fill: some ink must reach the outermost pixel column on both sides, or the crop left a margin.
-    const column = (c: number) => Math.max(...Array.from({ length: size }, (_, row) => px[(row * size + c) * 4 + 3]));
-    iconReport.push({
-      name: `chip-on-${icon.ground}-${size}.png`, bytes: bytes.length,
-      tile: at(13, 32), leaf: at(34, 30), edgeL: column(0), edgeR: column(size - 1),
-    });
+    // Positive checks: the blade is opaque ink at a point inside it (clear of the vein), and
+    // ink comes within a pixel of both edges along one axis, or the crop left a margin. (Within
+    // a pixel, not on it: the reversed leaf sits 0.3 grid units inside the regular outline.)
+    const alpha = (pxX: number, pxY: number) => px[(Math.min(size - 1, pxY) * size + Math.min(size - 1, pxX)) * 4 + 3];
+    const inBlade = placeBare({ x: 24, y: 34 });
+    const blade = alpha(Math.floor(((inBlade.x - ICON_VIEW.x) * size) / ICON_VIEW.side), Math.floor(((inBlade.y - ICON_VIEW.y) * size) / ICON_VIEW.side));
+    const line = (get: (i: number) => number) => Math.max(...Array.from({ length: size }, (_, i) => get(i)));
+    const [left, right] = [line((r) => Math.max(alpha(0, r), alpha(1, r))), line((r) => Math.max(alpha(size - 1, r), alpha(size - 2, r)))];
+    const [top, bottom] = [line((c) => Math.max(alpha(c, 0), alpha(c, 1))), line((c) => Math.max(alpha(c, size - 1), alpha(c, size - 2)))];
+    iconReport.push({ name, bytes: bytes.length, blade, fills: (left >= 20 && right >= 20) || (top >= 20 && bottom >= 20) });
   }
 }
 
@@ -432,8 +384,6 @@ const near = (a: number, b: number, tol = 0.05) => Math.abs(a - b) <= tol;
 if (!near(LOCK.faceAngle, EDGE_ANGLE)) problems.push(`lockup cut at ${LOCK.faceAngle.toFixed(2)}°, not parallel to the w (${EDGE_ANGLE.toFixed(2)}°)`);
 if (!near(LOCK.placedGap, LOCK.gap)) problems.push(`lockup gap ${LOCK.placedGap.toFixed(2)}, expected ${LOCK.gap.toFixed(2)}`);
 if (!near(LOCK.above, LOCK.below, 0.5)) problems.push(`lockup not centred: ${LOCK.above.toFixed(1)} above vs ${LOCK.below.toFixed(1)} below`);
-if (!near(LEAF_IN_TILE, 45)) problems.push(`leaf sits at ${LEAF_IN_TILE.toFixed(2)}° in the tile, expected 45°`);
-for (const [side, g] of Object.entries(CHIP.gaps)) if (!near(g, TILE.margin)) problems.push(`chip ${side} gap ${g.toFixed(2)}, expected ${TILE.margin}`);
 if (POPUP_LOCKUP.includes('currentColor') || !POPUP_LOCKUP.includes(`fill="${INK_LIGHT}"`)) problems.push('icons/lockup-popup.svg: ink colour not baked in');
 for (const [name, svg] of Object.entries(README_LOCKUPS)) {
   const ink = name.includes('light') ? INK_DARK : INK_LIGHT;
@@ -445,18 +395,16 @@ for (const [name, svg] of Object.entries({ ...FILES, 'icons/lockup-popup.svg': P
   for (const id of new Set(refs)) if (!svg.includes(`id="${id}"`)) problems.push(`${name}: references #${id}, which is not defined`);
 }
 for (const r of iconReport) {
-  if (r.tile < 250) problems.push(`${r.name}: tile not opaque (alpha ${r.tile})`);
-  if (r.leaf > 5) problems.push(`${r.name}: leaf not cut out (alpha ${r.leaf})`);
-  if (r.edgeL < 20 || r.edgeR < 20) problems.push(`${r.name}: tile does not reach the icon edge (edge alpha ${r.edgeL}/${r.edgeR})`);
+  if (r.blade < 250) problems.push(`${r.name}: blade not opaque (alpha ${r.blade})`);
+  if (!r.fills) problems.push(`${r.name}: the leaf stops short of the icon's edges`);
 }
 
 console.log('');
 console.log(`  w outer-left edge  (${W_EDGE.top.x},${W_EDGE.top.y}) → (${W_EDGE.bottom.x},${W_EDGE.bottom.y}), ${EDGE_ANGLE.toFixed(2)}°`);
 console.log(`  leaf tilt          ${TILT.toFixed(2)}°`);
 console.log(`  lockup             cut ${LOCK.faceAngle.toFixed(2)}°, gap ${LOCK.placedGap.toFixed(2)} (o→w ${LOCK.gap.toFixed(2)}), ${LOCK.above.toFixed(1)} above / ${LOCK.below.toFixed(1)} below`);
-console.log(`  chip               turn ${TURN.toFixed(2)}°, leaf ${LEAF_IN_TILE.toFixed(2)}° in tile, gaps ${Object.values(CHIP.gaps).map((g) => g.toFixed(2)).join(' / ')}, tile 48 × ${CHIP.tileH.toFixed(2)}`);
-console.log(`  weights            regular stem ${REGULAR.stem} vein ${REGULAR.vein} · reversed stem ${REVERSED.stem} vein ${REVERSED.vein} edge −${REVERSED.edge} · 16px stem ${at16(REGULAR, CHIP.s, ICON_VIEW.side / 16).stem}, no vein`);
-console.log(`  icon crop          tile ${ICON_VIEW.w.toFixed(2)} × ${ICON_VIEW.h.toFixed(2)} in a ${ICON_VIEW.side.toFixed(2)} square (was 64): ${(64 / ICON_VIEW.side).toFixed(2)}× larger`);
+console.log(`  weights            regular stem ${REGULAR.stem} vein ${REGULAR.vein} · reversed stem ${REVERSED.stem} vein ${REVERSED.vein} edge −${REVERSED.edge} · 16px stem ${at16(REGULAR, BARE.s, ICON_VIEW.side / 16).stem}, no vein`);
+console.log(`  icon crop          leaf in a ${ICON_VIEW.side.toFixed(2)} square (was 64): ${(64 / ICON_VIEW.side).toFixed(2)}× larger`);
 console.log(`  colour (popup)     underscore ${ACCENT} · icon ink ${INK_DARK} on light, ${INK_LIGHT} on dark`);
 console.log('');
 if (problems.length) {
@@ -464,5 +412,5 @@ if (problems.length) {
   for (const p of problems) console.error(`  ! ${p}`);
   process.exitCode = 1;
 } else {
-  console.log(`✓ ${Object.keys(FILES).length} SVGs in brand/; ${iconReport.length} PNGs + lockup-popup.svg in brand/icons/; 2 README lockups in brand/readme/ (tile opaque, leaf cut out, tile reaches the edge in every PNG)`);
+  console.log(`✓ ${Object.keys(FILES).length} SVGs in brand/; ${iconReport.length} PNGs + lockup-popup.svg in brand/icons/; 2 README lockups in brand/readme/ (blade opaque, leaf fills the square in every PNG)`);
 }

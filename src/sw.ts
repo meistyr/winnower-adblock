@@ -164,9 +164,9 @@ async function syncAll() {
 // --- toolbar icon ---------------------------------------------------------------
 
 // A PNG cannot follow light and dark mode the way an SVG with currentColor can,
-// so there are two sets (see brand/README.md). On a light toolbar the leaf is
-// drawn thinner, because a light shape on dark reads heavier.
-const iconPaths = (ground: 'light' | 'dark') => ({ 16: `icons/chip-on-${ground}-16.png`, 32: `icons/chip-on-${ground}-32.png` });
+// so there are two sets (see brand/README.md). On a dark toolbar the leaf is light,
+// so it is drawn thinner, because a light shape on dark reads heavier.
+const iconPaths = (ground: 'light' | 'dark') => ({ 16: `icons/mark-on-${ground}-16.png`, 32: `icons/mark-on-${ground}-32.png` });
 
 async function ensureColorSchemeWatcher() {
   const open = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
