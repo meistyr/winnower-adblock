@@ -29,7 +29,23 @@ are drawn differently, not just recoloured.
   `npm run brand` keeps the icons in step.
 - The green is made for the dark popup (10.8:1 on `#0f1310`). On white it is pale, 1.7:1.
 
-Files are cropped tight to the ink. Leave clear space around them where they're placed.
+## Clear space
+
+Files are cropped tight to the ink, so leave room around them where they're placed:
+
+- **Lockup:** one letter on every side. Geist Mono gives every character the same width (600 font
+  units), so that's the width of any letter in `winnower_`.
+- **Bare leaf and chip:** a quarter of the file's width on every side.
+
+## Minimum size
+
+- **Lockup:** 20px tall on screen, its size in the website's navigation on phones.
+- **Bare leaf and chip:** 16px, the size of the smallest toolbar icon.
+
+## Using the logo
+
+Use the logo to link to winnower or to write about it. Please don't use it for a fork or another
+product, so people can tell the official winnower apart.
 
 ## Why it looks the way it does
 
