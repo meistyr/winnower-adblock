@@ -255,12 +255,42 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
   if (msg?.type === 'winnower:cosmetic') {
     const reply = replyFor(msg.type, sendResponse);
     (async () => {
-      if (await isAllowlisted(msg.hostname)) {
+      // The switches are scoped to the site in the address bar, not to the
+      // frame asking. A cross-origin iframe reports its own hostname, so
+      // checking that left every third-party frame on a paused page still
+      // filtered, while the network layer turned off correctly —
+      // allowAllRequests matches the main-frame navigation and cascades to the
+      // whole frame tree. sender.tab.url is the top-level document, which is
+      // what was paused. Readable without the tabs permission because winnower
+      // holds <all_urls> host permissions.
+      let site: string | null = null;
+      try {
+        if (sender.tab?.url) site = new URL(sender.tab.url).hostname;
+      } catch {
+        /* unparseable top-level URL — leave site null and step back below */
+      }
+
+      // A null site means the page this frame belongs to could not be
+      // identified. Paused means paused: when winnower cannot tell which site
+      // it is on, it steps back rather than risk filtering one someone paused.
+      // Falling back to the frame's own hostname would reinstate exactly the
+      // bug above — a third-party box answering for itself.
+      if (site === null || (await isAllowlisted(site))) {
         reply({ selectors: [], off: true });
         return;
       }
+      // Selectors stay keyed to the frame's own hostname: cosmetic rules are
+      // written per frame domain, not per top-level site.
       reply({ selectors: await selectorsFor(String(msg.hostname || '')), off: false });
-    })().catch(() => reply({ selectors: [], off: false }));
+    })().catch(() =>
+      // The decision could not be completed — in practice chrome.storage
+      // failing because the extension context was invalidated by a reload or
+      // an update. That is the same event that loses the content script's
+      // message, so both paths answer it the same way: paused means paused,
+      // and an unreadable setting is not grounds for filtering a page someone
+      // may have paused.
+      reply({ selectors: [], off: true }),
+    );
     return true;
   }
 
