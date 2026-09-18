@@ -6,6 +6,8 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-18
+
 ### Fixed
 
 - **Pausing a site:** pausing winnower on a site now stops it hiding things inside content the
@@ -58,6 +60,7 @@ First release.
 - **Release zip:** loads with Load unpacked, with `CREDITS.txt` naming every filter list and the
   licence it declares.
 
-[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.2.1
 [0.2.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.2.0
 [0.1.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.1.0
