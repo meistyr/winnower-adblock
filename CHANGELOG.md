@@ -11,9 +11,9 @@ All notable changes to winnower are documented here. The format follows
 - **Pausing a site:** pausing winnower on a site now stops it hiding things inside content the
   page has embedded from somewhere else, too. Before, the page itself was left alone while
   anything embedded in it was still filtered.
-- **Settings at start-up:** winnower no longer carries on filtering a paused site during the
-  moment after a browser or extension restart when it cannot read your settings. It asks again
-  instead of assuming it is switched on.
+- **When winnower is unsure:** if it cannot tell which site a page belongs to, or cannot read
+  your settings — both possible for a moment after a browser or extension restart — it now
+  blocks nothing, rather than risk filtering a site you had paused.
 
 ## [0.2.0] - 2026-09-17
 

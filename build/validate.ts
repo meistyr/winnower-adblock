@@ -10,6 +10,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import type { PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
+import { checkSwitches } from './check-switches.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
@@ -138,6 +139,14 @@ console.log(`  popup guard refuses ${refusedOwn.toLocaleString()} / ${popupPatte
 console.log('');
 for (const host of refusedSignIns) problems.push(`the popup guard refuses windows to ${host}, a sign-in host. Find the $popup filter naming it.`);
 if (refusedOwn === 0) problems.push('the popup guard refuses none of its own hosts');
+console.log('');
+
+// The kill switches, asked directly. Both of their known failures were invisible
+// from the top of a page, and neither can be provoked from a browser — see
+// build/check-switches.ts.
+const switches = await checkSwitches();
+for (const line of switches.lines) console.log(line);
+problems.push(...switches.problems);
 
 if (totalRegexp > MAX_REGEXP_RULES) problems.push(`${totalRegexp} regexp rules exceeds the hard cap of ${MAX_REGEXP_RULES}`);
 if (totalRules === 0) problems.push('zero rules across all rulesets');
