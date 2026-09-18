@@ -26,7 +26,7 @@ import type { PopupPatterns } from '../src/shared/catalogue.ts';
 const SRC = new URL('../src/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
 
-const ENTRIES = ['sw', 'popup', 'cosmetic', 'offscreen', 'popup-guard'] as const;
+const ENTRIES = ['sw', 'popup', 'content', 'offscreen', 'popup-guard'] as const;
 
 // The popup guard's host lists are baked in at compile time. It runs in the MAIN
 // world, where there is no chrome.runtime to fetch them with.

@@ -58,13 +58,17 @@ const manifest = {
 
   content_scripts: [
     // Cosmetic filtering. The generic stylesheet is injected natively here so
-    // it lands before first paint — no JS, no flash. cosmetic.js handles only
+    // it lands before first paint — no JS, no flash. content.js handles only
     // the domain-specific selectors, which it fetches via the service worker.
     // ISOLATED world (the default) is required: it needs chrome.runtime.
+    //
+    // all_frames injects a SEPARATE copy into every embedded frame, each of
+    // which asks the worker its own question. That is why the worker decides
+    // on/off from the tab rather than from the hostname the frame reports.
     {
       matches: ['<all_urls>'],
       css: ['cosmetic/generic.css'],
-      js: ['cosmetic.js'],
+      js: ['content.js'],
       run_at: 'document_start',
       all_frames: true,
     },
