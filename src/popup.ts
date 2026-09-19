@@ -7,14 +7,14 @@
  * happened on the page you are looking at.
  */
 import type { BuildStats, ListGroup } from './shared/catalogue.ts';
-import { RELEASES_PAGE } from './shared/constants.ts';
+import { DOWNLOAD_PAGE } from './shared/constants.ts';
 import { formatLog, formatTime, groupRepeats, type LogLine } from './shared/log.ts';
 import type { Message, PopupState, Reply } from './shared/messages.ts';
 
 const GROUPS: ReadonlyArray<{ key: ListGroup; label: string; note: string }> = [
   { key: 'ads',        label: 'Ads',            note: 'EasyList + uBlock Origin filters' },
   { key: 'tracking',   label: 'Tracking',       note: 'EasyPrivacy, Peter Lowe' },
-  { key: 'popups',     label: 'Popups',         note: 'Popunders — also blocks visiting those domains' },
+  { key: 'popups',     label: 'Popups',         note: 'Popunders, and visiting those domains too' },
   { key: 'cookies',    label: 'Cookie banners', note: 'Consent overlays' },
   { key: 'annoyances', label: 'Annoyances',     note: 'Newsletter nags, overlays. May break sites.' },
 ];
@@ -111,7 +111,7 @@ function renderState(state: PopupState) {
   $('site-label').textContent = active ? 'Blocking on this site' : 'Paused on this site';
   $('site-sub').textContent = !state.master
     ? 'Master switch is off'
-    : state.allowlisted ? 'Allowlisted — nothing is blocked here' : 'Ads, trackers and popups';
+    : state.allowlisted ? 'Allowlisted, nothing is blocked here' : 'Ads, trackers and popups';
 
   $<HTMLInputElement>('master-toggle').checked = state.master;
   $('master-banner').hidden = state.master;
@@ -160,8 +160,8 @@ function renderState(state: PopupState) {
 /**
  * The paused-sites list, and the button that opens it.
  *
- * The allowlist has always been in PopupState — buildState in src/sw.ts puts it
- * there — and this menu never rendered it, so the only way to find out whether
+ * The allowlist has always been in PopupState, buildState in src/sw.ts puts it
+ * there, and this menu never rendered it, so the only way to find out whether
  * a site was paused was to go and visit it. That cost a long detour once:
  * amazon.com and amazon.co.uk are separate allowlist entries, and neither of us
  * could see which one had been paused.
@@ -215,8 +215,8 @@ function renderPaused(state: PopupState) {
  * the master switch both act on the page you are looking at, so they reload it
  * unconditionally; a site resumed from this list is usually NOT the open tab,
  * and reloading it would throw away whatever you were doing for a change that
- * does not affect it. Matched the way isAllowlisted does in src/sw.ts — exact
- * host or subdomain — so the reload happens exactly when this page's filtering
+ * does not affect it. Matched the way isAllowlisted does in src/sw.ts, exact
+ * host or subdomain, so the reload happens exactly when this page's filtering
  * actually changed.
  */
 async function unpause(site: string, button: HTMLButtonElement) {
@@ -268,7 +268,7 @@ function renderLog() {
 
   // Grouped by site, same as the copied text: a log is read by someone working
   // out which page each run belongs to. Identical lines from one pass are
-  // folded into a count — a grid of twenty cards is twenty real elements and
+  // folded into a count, a grid of twenty cards is twenty real elements and
   // twenty identical lines, and the count says all of what they said.
   let host: string | undefined;
   for (const line of groupRepeats(logLines)) {
@@ -283,7 +283,7 @@ function renderLog() {
     const row = document.createElement('div');
     row.className = 'log-line';
     row.innerHTML = '<span class="log-t"></span><span class="log-layer"></span><span class="log-verb"></span><span class="log-msg"></span>';
-    const text = line.reason ? `${line.subject} — ${line.reason}` : line.subject;
+    const text = line.reason ? `${line.subject}: ${line.reason}` : line.subject;
     row.querySelector('.log-t')!.textContent = formatTime(line.t);
     row.querySelector('.log-layer')!.textContent = line.layer;
     const verb = row.querySelector('.log-verb')!;
@@ -296,7 +296,7 @@ function renderLog() {
       times.textContent = ` ×${line.count}`;
       row.querySelector('.log-msg')!.appendChild(times);
     }
-    row.title = line.count > 1 ? `${text} — ${line.count} times in this pass` : text;
+    row.title = line.count > 1 ? `${text} (${line.count} times in this pass)` : text;
     list.appendChild(row);
   }
 }
@@ -310,7 +310,7 @@ async function openLog() {
 
 async function countActiveRules(state: PopupState) {
   // Rule counts come from the build's stats file, filtered to what is enabled
-  // right now — so this reflects the toggles, not the total ever built.
+  // right now, so this reflects the toggles, not the total ever built.
   try {
     const stats = (await (await fetch(chrome.runtime.getURL('rules/_stats.json'))).json()) as BuildStats;
     const perList = new Map(stats.lists.map((l): [string, number] => [l.name, l.rules]));
@@ -338,8 +338,8 @@ async function showUpdateIfAny() {
   if (!answer?.newer || !answer.latest) return;
   const link = $<HTMLAnchorElement>('update-link');
   $('update-text').textContent = `${answer.latest.replace(/^v/i, '')} available`;
-  link.href = RELEASES_PAGE;
-  link.title = `winnower ${answer.latest} has been released — opens the releases page`;
+  link.href = DOWNLOAD_PAGE;
+  link.title = `winnower ${answer.latest} has been released. Opens the download page`;
   link.hidden = false;
 }
 
@@ -386,7 +386,7 @@ async function init() {
   $('diag-back').addEventListener('click', () => showView('main', 'open-diag'));
 
   $('diag-copy').addEventListener('click', async () => {
-    const header = `winnower v${chrome.runtime.getManifest().version} — ${logLines.length} lines`;
+    const header = `winnower v${chrome.runtime.getManifest().version}, ${logLines.length} lines`;
     try {
       await navigator.clipboard.writeText(formatLog(logLines, header));
       flash($('diag-copy'), 'Copied');
@@ -411,7 +411,7 @@ async function init() {
     await reloadTab();
   });
 
-  // Five clicks on the version reveal developer mode — the Android gesture.
+  // Five clicks on the version reveal developer mode, the Android gesture.
   // Nothing advertises it, which is the point: it is for whoever is working on
   // winnower, and everyone else gets the errors without touching anything.
   let versionClicks = 0;

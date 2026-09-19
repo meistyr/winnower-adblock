@@ -22,7 +22,7 @@ export const ALLOWLIST_PRIORITY = 2_000_000_000;
  * branch of the DOM), Twitch hid one of them with an inline style, and the
  * collapser read that as its own handiwork and hid the slot. Twitch then
  * measured the slot to place the player, got 0x0, and parked the player
- * offscreen — audio still playing, picture nowhere, the channel's own
+ * offscreen, audio still playing, picture nowhere, the channel's own
  * background colour filling the hole.
  *
  * A marker only winnower emits turns "is this hidden" into "did WE hide this".
@@ -38,7 +38,7 @@ export const HID_MARKER = '--winnower-hid';
  * per-domain <style> the content script injects.
  *
  * One constant rather than three copies: src/collapse.ts only collapses when it
- * finds this, so a copy that drifted would not fail — it would quietly stop the
+ * finds this, so a copy that drifted would not fail: it would quietly stop the
  * collapser finding any evidence at all, anywhere, and empty ad boxes would come
  * back with nothing logged. build/validate.ts asserts it survives into the built
  * stylesheet for the same reason.
@@ -55,10 +55,16 @@ export const HIDE_DECLARATION = `{display:none!important;${HID_MARKER}:1}`;
  * This is the only request winnower makes after it is installed. Unauthenticated
  * and with no identifier of any kind, so GitHub sees an address asking a public
  * URL and nothing distinguishes one winnower from another. Nothing is collected
- * by winnower itself — there is no server to collect it to.
+ * by winnower itself, there is no server to collect it to.
  */
 export const RELEASES_API = 'https://api.github.com/repos/meistyr/winnower-adblock/releases/latest';
-export const RELEASES_PAGE = 'https://github.com/meistyr/winnower-adblock/releases/latest';
+
+/**
+ * Where the notice sends people: winnower's own download page, not the GitHub
+ * release. Someone told there is a new version wants the instructions for
+ * replacing the one they have, which is what that page is for.
+ */
+export const DOWNLOAD_PAGE = 'https://winnower.meistyr.tech/download';
 
 /**
  * At most one check a day.
