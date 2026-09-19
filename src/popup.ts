@@ -7,6 +7,7 @@
  * happened on the page you are looking at.
  */
 import type { BuildStats, ListGroup } from './shared/catalogue.ts';
+import { RELEASES_PAGE } from './shared/constants.ts';
 import { formatLog, formatTime, type LogLine } from './shared/log.ts';
 import type { Message, PopupState, Reply } from './shared/messages.ts';
 
@@ -319,6 +320,23 @@ async function countActiveRules(state: PopupState) {
   }
 }
 
+/**
+ * Show the header notice if a newer release is out.
+ *
+ * Deliberately not awaited by init: the worker may answer from a cache or may
+ * go to the network, and the menu must not sit blank while it finds out. It
+ * appears when it appears.
+ */
+async function showUpdateIfAny() {
+  const answer = await send({ type: 'winnower:update' });
+  if (!answer?.newer || !answer.latest) return;
+  const link = $<HTMLAnchorElement>('update-link');
+  $('update-text').textContent = `${answer.latest.replace(/^v/i, '')} available`;
+  link.href = RELEASES_PAGE;
+  link.title = `winnower ${answer.latest} has been released — opens the releases page`;
+  link.hidden = false;
+}
+
 async function refresh() {
   const state = await send({ type: 'winnower:state', tabId: tab?.id, hostname });
   if (!state) return;
@@ -400,6 +418,7 @@ async function init() {
   });
 
   await refresh();
+  void showUpdateIfAny();
 }
 
 init();

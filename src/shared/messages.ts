@@ -21,6 +21,8 @@ export type Message =
   | { type: 'winnower:diagnostics' }
   | { type: 'winnower:clearDiagnostics' }
   | { type: 'winnower:toggleDev' }
+  /** popup: is a newer release out? Answered from a cache checked at most daily. */
+  | { type: 'winnower:update' }
   /** offscreen document: Chrome's light/dark mode, for the toolbar icon */
   | { type: 'winnower:colorScheme'; dark: boolean };
 
@@ -52,6 +54,7 @@ export interface Replies {
   'winnower:diagnostics': { lines: LogLine[]; dev: boolean } | null;
   'winnower:clearDiagnostics': { recorded: number } | null;
   'winnower:toggleDev': { dev: boolean } | null;
+  'winnower:update': { latest: string; newer: boolean } | null;
   'winnower:colorScheme': undefined;
 }
 

@@ -12,6 +12,7 @@ import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
 import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/collapse-match.ts';
 import { formatLine, isAlwaysKept, type LogLine } from '../src/shared/log.ts';
+import { isNewer } from '../src/shared/version.ts';
 import { checkSwitches } from './check-switches.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
@@ -206,6 +207,24 @@ const rendered = formatLine(ERR);
 const hasReason = rendered.includes('— boom') && rendered.includes('collapse') && rendered.includes('1.2s');
 console.log(`  ${hasReason ? 'ok  ' : 'FAIL'}  log: line carries time, layer and reason   ${JSON.stringify(rendered.trim())}`);
 if (!hasReason) problems.push(`a log line renders as ${JSON.stringify(rendered)}, missing its time, layer or reason`);
+// The update check's comparison. Text comparison is the trap here — "0.10.0"
+// sorts BELOW "0.9.0" as a string, so the release that matters is the one that
+// never gets announced.
+const VERSIONS: [string, string, boolean][] = [
+  ['v0.3.0', '0.2.1', true],
+  ['0.2.1', '0.2.1', false],
+  ['0.2.0', '0.2.1', false],
+  ['v0.10.0', '0.9.0', true],
+  ['1.0.0', '0.99.99', true],
+  ['', '0.2.1', false],
+  ['not-a-version', '0.2.1', false],
+];
+for (const [latest, current, want] of VERSIONS) {
+  const got = isNewer(latest, current);
+  const label = `${latest || '(empty)'} over ${current}`;
+  console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  update: ${label.padEnd(28)} ${got ? 'newer' : 'no news'}`);
+  if (got !== want) problems.push(`the update check says ${latest} over ${current} is ${got}, expected ${want}`);
+}
 console.log('');
 
 // The kill switches, asked directly. Both of their known failures were invisible

@@ -14,7 +14,11 @@
  * means a page cannot tell whether winnower is installed.
  */
 import { bucketOf, type CosmeticBucket } from './shared/bucket.ts';
-import { ALLOWLIST_PRIORITY, ALLOWLIST_RULE_BASE } from './shared/constants.ts';
+import {
+  ALLOWLIST_PRIORITY, ALLOWLIST_RULE_BASE, BADGE_IDLE, BADGE_UPDATE,
+  RELEASES_API, UPDATE_CHECK_INTERVAL_MS,
+} from './shared/constants.ts';
+import { isNewer } from './shared/version.ts';
 import type { DynamicScript, RulesetEntry } from './shared/catalogue.ts';
 import { LOG_CAP, isAlwaysKept, type LogLine } from './shared/log.ts';
 import type { Message, MessageType, PopupState, Reply } from './shared/messages.ts';
@@ -254,10 +258,90 @@ ensureColorSchemeWatcher().catch(() => {});
 
 const blockedByTab = new Map<number, number>();
 
+// --- update check -----------------------------------------------------------
+
+/** Remembered so the badge can be painted without waiting on a network call. */
+let updatePending = false;
+
+interface UpdateCheck {
+  /** When the last attempt finished, successful or not. */
+  checkedAt: number;
+  /** The newest tag GitHub reported, or '' if it has never answered. */
+  latest: string;
+}
+
+/**
+ * Ask GitHub for the newest release, at most once a day.
+ *
+ * Runs when the worker starts — which is whenever winnower is doing anything —
+ * rather than only when the menu is opened, so someone who never opens the menu
+ * still finds out. The day's interval is held in storage rather than in memory:
+ * MV3 stops an idle worker within seconds, and an in-memory timestamp would
+ * mean a check on every wake.
+ *
+ * Never throws and never surfaces a failure. Offline, rate-limited, GitHub
+ * down — none of that is the reader's problem, and an extension complaining
+ * that it could not check for updates is worse than one that quietly tries
+ * again tomorrow. A failed attempt still moves checkedAt, so a machine with no
+ * connection makes one attempt a day rather than one per worker wake.
+ */
+async function checkUpdate(): Promise<{ latest: string; newer: boolean }> {
+  const current = chrome.runtime.getManifest().version;
+  let state: UpdateCheck = { checkedAt: 0, latest: '' };
+  try {
+    const stored = await chrome.storage.local.get({ updateCheck: state });
+    if (stored.updateCheck && typeof stored.updateCheck === 'object') {
+      state = stored.updateCheck as UpdateCheck;
+    }
+  } catch {
+    /* unreadable settings — treat as never checked */
+  }
+
+  if (Date.now() - (state.checkedAt || 0) > UPDATE_CHECK_INTERVAL_MS) {
+    try {
+      const res = await fetch(RELEASES_API, { headers: { accept: 'application/vnd.github+json' } });
+      const json = (await res.json()) as { tag_name?: string };
+      const tag = String(json?.tag_name ?? '').trim();
+      state = { checkedAt: Date.now(), latest: tag || state.latest };
+    } catch {
+      state = { ...state, checkedAt: Date.now() };
+    }
+    try {
+      await chrome.storage.local.set({ updateCheck: state });
+    } catch {
+      /* the answer is still good for this worker's lifetime */
+    }
+  }
+
+  const newer = isNewer(state.latest, current);
+  if (newer !== updatePending) {
+    updatePending = newer;
+    repaintBadges();
+  }
+  return { latest: state.latest, newer };
+}
+
 function setBadge(tabId: number) {
   const n = blockedByTab.get(tabId) ?? 0;
-  chrome.action.setBadgeText({ tabId, text: n > 0 ? String(n) : '' }).catch(() => {});
-  chrome.action.setBadgeBackgroundColor({ tabId, color: '#3d3d3d' }).catch(() => {});
+  // A tint alone cannot carry the news: the badge is only drawn when there is
+  // something in it, so on a page where nothing was blocked there would be no
+  // badge to tint. A dot gives the tint something to colour.
+  const text = n > 0 ? String(n) : updatePending ? '•' : '';
+  chrome.action.setBadgeText({ tabId, text }).catch(() => {});
+  chrome.action
+    .setBadgeBackgroundColor({ tabId, color: updatePending ? BADGE_UPDATE : BADGE_IDLE })
+    .catch(() => {});
+  // Green badge, dark text — the brand green is light, and Chrome's default
+  // white on it is unreadable.
+  chrome.action.setBadgeTextColor?.({ tabId, color: updatePending ? '#0f1a12' : '#ffffff' }).catch(() => {});
+}
+
+/** Repaint every tab's badge, after the update state changes under them. */
+function repaintBadges() {
+  for (const tabId of blockedByTab.keys()) setBadge(tabId);
+  chrome.tabs.query({}).then((tabs) => {
+    for (const t of tabs) if (typeof t.id === 'number') setBadge(t.id);
+  }).catch(() => {});
 }
 
 // onRuleMatchedDebug fires only for unpacked extensions, which is exactly how
@@ -375,6 +459,12 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
     return true;
   }
 
+  if (msg?.type === 'winnower:update') {
+    const reply = replyFor(msg.type, sendResponse);
+    checkUpdate().then(reply).catch(() => reply(null));
+    return true;
+  }
+
   if (msg?.type === 'winnower:log') {
     // The site is read off the sender, never off the message. winnower listens
     // on every site, so the lines themselves are whatever a page chose to send;
@@ -478,3 +568,8 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
 
 chrome.runtime.onInstalled.addListener(() => { syncAll().catch(() => {}); });
 chrome.runtime.onStartup.addListener(() => { syncAll().catch(() => {}); });
+
+// At module scope rather than behind onStartup/onInstalled, so it runs whenever
+// the worker wakes — which is whenever winnower is doing anything. The day's
+// interval lives in storage, so waking often costs nothing.
+void checkUpdate().catch(() => {});

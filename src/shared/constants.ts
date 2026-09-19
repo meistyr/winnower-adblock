@@ -44,3 +44,31 @@ export const HID_MARKER = '--winnower-hid';
  * stylesheet for the same reason.
  */
 export const HIDE_DECLARATION = `{display:none!important;${HID_MARKER}:1}`;
+
+/**
+ * Where the update check asks, and where it sends people.
+ *
+ * Chrome does not auto-update an extension loaded unpacked, and winnower is
+ * installed unpacked from a zip, so someone on an old version has no way to
+ * learn a newer one exists without going and looking.
+ *
+ * This is the only request winnower makes after it is installed. Unauthenticated
+ * and with no identifier of any kind, so GitHub sees an address asking a public
+ * URL and nothing distinguishes one winnower from another. Nothing is collected
+ * by winnower itself — there is no server to collect it to.
+ */
+export const RELEASES_API = 'https://api.github.com/repos/meistyr/winnower-adblock/releases/latest';
+export const RELEASES_PAGE = 'https://github.com/meistyr/winnower-adblock/releases/latest';
+
+/**
+ * At most one check a day.
+ *
+ * GitHub allows 60 unauthenticated requests an hour per address, so this is
+ * nowhere near a limit; the interval is about not making a request winnower has
+ * no use for rather than about rate limits.
+ */
+export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** The badge behind the blocked count: grey normally, brand green when an update is waiting. */
+export const BADGE_IDLE = '#3d3d3d';
+export const BADGE_UPDATE = '#7bd88f';

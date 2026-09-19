@@ -19,6 +19,12 @@ All notable changes to winnower are documented here. The format follows
   **Developer mode** — five clicks on the version number at the bottom of the menu — records every
   decision winnower makes rather than only the errors. Nothing is ever sent anywhere, and the
   record is thrown away when you close your browser.
+- **New version notice:** winnower checks once a day whether a newer version has been released.
+  When one has, the toolbar icon's badge turns green and the menu shows **0.3.0 available** at the
+  top, linking to the download. Chrome never updates winnower for you — it is installed from a
+  zip — so until now there was no way to find out a new version existed. This is the only time
+  winnower contacts anything after you install it: it asks GitHub for the latest version number
+  and nothing else, with no account, no identifier and nothing recorded about you.
 
 ### Fixed
 
