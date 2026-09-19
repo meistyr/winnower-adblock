@@ -30,8 +30,9 @@ or turn it off everywhere.
 
 Streaming ads that are stitched into the video itself are not blocked.
 
-winnower sends nothing anywhere. The filter lists ship inside the extension, and it only ever
-reads its own files.
+winnower collects nothing about you and has no server to collect it to. The filter lists ship
+inside the extension. The one thing it asks anyone for is GitHub's latest version number, once a
+day, so it can tell you when a new release is out — no account, no identifier, nothing else.
 
 ## Install
 
@@ -64,6 +65,32 @@ gitignored; `npm run update` rebuilds it from scratch.
 | `brand/` | Logo files and toolbar icons (see [`brand/README.md`](brand/README.md)) |
 
 Releases are built by GitHub Actions when a `v*` tag is pushed. See [`CHANGELOG.md`](CHANGELOG.md).
+
+### Developer mode
+
+winnower records only errors by default, so anyone reporting a broken site can open
+**Diagnostics** in the menu and press **Copy** without setting anything up first.
+
+Developer mode records everything else too: every rule applied, every box collapsed, and — most
+usefully — every box deliberately left alone, with the reason.
+
+```
+ 8.1s  collapse  skip  div.channel-page__video-player — nothing of ours hidden inside
+12.6s  collapse  hid   div.duet--homepage-category-shelves-rail-section — 300×1348 emptied wrapper
+```
+
+**To turn it on,** open winnower's menu and click the version number in the bottom-right corner
+five times. A **Developer mode** switch appears below the master switch. It is hidden rather than
+always shown because the menu is small and almost nobody needs it; once it is on the switch stays
+visible, so you do not have to remember the trick to turn it off.
+
+**Turn it off when you are done.** winnower keeps only the last 500 lines, and a single busy page
+writes a hundred or more, so leaving it on means whatever you were looking for has been pushed
+out by the time you go to read it. Toggling it reloads the page, because a page only learns
+whether to record when it starts.
+
+Nothing is sent anywhere either way. The recording is held for the browser session and thrown
+away when you close it.
 
 ## Licence
 
