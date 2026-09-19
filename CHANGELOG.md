@@ -6,6 +6,16 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Twitch:** the video player no longer turns into a solid block of colour when you reload a
+  channel page. winnower tidies away the empty boxes an ad leaves behind when it hides one, and
+  it was counting boxes the site had emptied itself as its own work. On Twitch that meant
+  removing the space the player sits in, leaving the channel's background colour showing through
+  while the stream carried on playing with no picture. It now only tidies up after itself, which
+  also fixes the same mistake on any other site that keeps its video player outside the part of
+  the page it appears in.
+
 ## [0.2.1] - 2026-09-18
 
 ### Fixed
@@ -14,8 +24,8 @@ All notable changes to winnower are documented here. The format follows
   page has embedded from somewhere else, too. Before, the page itself was left alone while
   anything embedded in it was still filtered.
 - **When winnower is unsure:** if it cannot tell which site a page belongs to, or cannot read
-  your settings — both possible for a moment after a browser or extension restart — it now
-  blocks nothing, rather than risk filtering a site you had paused.
+  your settings (both possible for a moment after a browser or extension restart), it now blocks
+  nothing rather than risk filtering a site you had paused.
 
 ## [0.2.0] - 2026-09-17
 

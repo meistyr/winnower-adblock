@@ -19,6 +19,7 @@
  * itself and a pause is scoped to the page — see the handler in src/sw.ts.
  */
 import type { Message, Reply } from './shared/messages.ts';
+import { HIDE_DECLARATION } from './shared/constants.ts';
 import * as collapse from './collapse.ts';
 
 (() => {
@@ -76,10 +77,15 @@ import * as collapse from './collapse.ts';
     // over-long selector list in a single rule, and in CSS one invalid selector
     // invalidates every selector sharing its rule. Domain lists are small today
     // (~90 max), so this is insurance rather than a live fix.
+    //
+    // HIDE_DECLARATION rather than a literal: it carries the marker that lets
+    // the collapser recognise winnower's own hiding, and generic.css emits the
+    // same constant. A domain rule that hid without marking would leave the
+    // collapser blind to exactly the boxes these selectors just emptied.
     const CHUNK = 500;
     const parts: string[] = [];
     for (let i = 0; i < selectors.length; i += CHUNK) {
-      parts.push(selectors.slice(i, i + CHUNK).join(',\n') + '\n{display:none!important}');
+      parts.push(selectors.slice(i, i + CHUNK).join(',\n') + '\n' + HIDE_DECLARATION);
     }
 
     const style = document.createElement('style');

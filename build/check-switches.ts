@@ -18,6 +18,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { HIDE_DECLARATION } from '../src/shared/constants.ts';
 
 const EXT_DIR = new URL('../extension/', import.meta.url);
 
@@ -116,13 +117,18 @@ async function runContentScript(failures: number, reply: Reply) {
   });
 
   const documentElement = stubEl();
+  // Keep what the script builds. The marker that tells the collapser which
+  // hiding is winnower's own is assembled at runtime, not baked into the
+  // bundle as a literal, so grepping content.js for it proves nothing — the
+  // only honest check is what the script actually injects.
+  const created: ReturnType<typeof stubEl>[] = [];
   const document = {
     documentElement,
     getElementById: () => null,
     querySelectorAll: () => [],
     querySelector: () => null,
     addEventListener: () => {},
-    createElement: () => stubEl(),
+    createElement: () => { const el = stubEl(); created.push(el); return el; },
     head: stubEl(),
   };
 
@@ -150,12 +156,19 @@ async function runContentScript(failures: number, reply: Reply) {
     chrome,
     document,
     { hostname: 'www.amazon.com', href: 'https://www.amazon.com/' },
-    () => ({ display: 'block' }),
+    // getPropertyValue as well as display: the collapser reads the provenance
+    // marker off the same object, and a stub without it throws rather than
+    // failing a check, which would read as a broken harness and not a bug.
+    () => ({ display: 'block', getPropertyValue: () => '' }),
     (fn: () => void) => { fn(); return 0; },
     { log: () => {}, error: () => {} },
   );
 
-  return { sends, switchApplied: documentElement.dataset.winnowerOff === '1' };
+  return {
+    sends,
+    switchApplied: documentElement.dataset.winnowerOff === '1',
+    injectedCss: created.map((el) => el.textContent).join('\n'),
+  };
 }
 
 export async function checkSwitches(): Promise<CheckResult> {
@@ -208,6 +221,16 @@ export async function checkSwitches(): Promise<CheckResult> {
   // be set here, which turns off every rule in generic.css.
   const exhausted = await runContentScript(99, { selectors: [], off: true });
   note(exhausted.switchApplied && exhausted.sends === 4, 'steps back if every try is lost', `attempts=${exhausted.sends}, applied=${exhausted.switchApplied}`);
+
+  // --- the provenance marker on the rules the content script injects ---
+  // src/collapse.ts only collapses a box once it finds something WINNOWER hid
+  // inside it, and it knows winnower's own hiding by this marker. A domain rule
+  // that hid without marking would leave the collapser blind to precisely the
+  // boxes those selectors just emptied, and nothing would error — it would
+  // quietly collapse less. generic.css is asserted separately in validate.ts.
+  const injected = await runContentScript(0, { selectors: ['.ad-slot', '.promo'], off: false });
+  const marked = injected.injectedCss.includes(HIDE_DECLARATION);
+  note(marked, 'domain rules carry the hide marker', marked ? HIDE_DECLARATION : `injected ${JSON.stringify(injected.injectedCss.slice(-40))}`);
 
   return { lines, problems };
 }

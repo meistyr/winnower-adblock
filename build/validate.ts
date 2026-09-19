@@ -8,8 +8,9 @@
  */
 import { readFile, readdir } from 'node:fs/promises';
 import type { PopupPatterns } from '../src/shared/catalogue.ts';
-import { ALLOWLIST_PRIORITY } from '../src/shared/constants.ts';
+import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
+import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/collapse-match.ts';
 import { checkSwitches } from './check-switches.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
@@ -139,6 +140,55 @@ console.log(`  popup guard refuses ${refusedOwn.toLocaleString()} / ${popupPatte
 console.log('');
 for (const host of refusedSignIns) problems.push(`the popup guard refuses windows to ${host}, a sign-in host. Find the $popup filter naming it.`);
 if (refusedOwn === 0) problems.push('the popup guard refuses none of its own hosts');
+console.log('');
+
+// The collapser only hides a box when it finds something WINNOWER hid inside it,
+// and it recognises winnower's hiding by HID_MARKER. Losing the marker would not
+// error: the collapser would find no evidence anywhere, quietly stop collapsing,
+// and the empty ad boxes it exists to remove would come back with nothing
+// logged. So assert the marker reached the built files, rather than trusting
+// that the emitting code still runs.
+// Counted two ways on purpose: every hide in the file, and every hide carrying
+// the full marked declaration. Equal means none slipped through unmarked. The
+// domain selectors are checked in build/check-switches.ts instead, by running
+// the built content script and reading what it injects — the marker is
+// assembled at runtime there, so grepping the bundle would prove nothing.
+const genericCss = await readFile(new URL('cosmetic/generic.css', EXT_DIR), 'utf8');
+const hideBlocks = genericCss.split('display:none!important').length - 1;
+const marked = genericCss.split(HIDE_DECLARATION).length - 1;
+console.log(`  hide rules marked   ${marked.toLocaleString().padStart(8)} / ${hideBlocks.toLocaleString()} in generic.css`);
+if (hideBlocks === 0) problems.push('generic.css contains no hide rules at all');
+if (marked !== hideBlocks) problems.push(`${hideBlocks - marked} hide rules in generic.css carry no ${HID_MARKER}; the collapser is blind to whatever they hide`);
+
+// The collapser's judgement, asked directly — it is the part that has gone
+// wrong, twice, and neither failure was reachable from a browser test in time
+// to matter. Both directions asserted: a suite that only ever expects "skip"
+// passes just as loudly on a collapser that has stopped working entirely.
+const AD_WRAPPER: BoxFacts = {
+  tagName: 'DIV', width: 300, height: 250, textLength: 0, hasFormOrMedia: false,
+  subtreeCount: 3, hasAnchor: false, hasAriaOrRole: false, hasVisibleMedia: false,
+  hasWinnowerHiddenDescendant: true, seenBefore: true,
+};
+const SHAPES: [string, BoxFacts, Verdict][] = [
+  // The positive half. theverge.com leaves 2066x250 and 800x90 holes behind a
+  // generic rule; if these stop collapsing, winnower stops doing this job.
+  ['an emptied ad wrapper', AD_WRAPPER, 'collapse'],
+  ['the same box, first sighting', { ...AD_WRAPPER, seenBefore: false }, 'candidate'],
+  // twitch.tv's player slot, measured live: nine empty divs reserving space for
+  // a player positioned over them from another branch of the document, one of
+  // which Twitch itself had hidden. Identical to an emptied ad wrapper on every
+  // count except who did the hiding.
+  ["twitch.tv's player slot", { ...AD_WRAPPER, width: 859, height: 483, subtreeCount: 9, hasWinnowerHiddenDescendant: false }, 'skip'],
+  // YouTube's #guide-inner-content, caught mid-populate: 45 links, 64 buttons.
+  ["YouTube's guide, mid-populate", { ...AD_WRAPPER, subtreeCount: 64, hasAnchor: true }, 'skip'],
+  ['a full-height page container', { ...AD_WRAPPER, height: 1800 }, 'skip'],
+  ['a box showing text', { ...AD_WRAPPER, textLength: 40 }, 'skip'],
+];
+for (const [label, facts, want] of SHAPES) {
+  const got = collapseVerdict(facts);
+  console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  collapser: ${label.padEnd(30)} ${got}`);
+  if (got !== want) problems.push(`the collapser answers "${got}" for ${label}, expected "${want}"`);
+}
 console.log('');
 
 // The kill switches, asked directly. Both of their known failures were invisible

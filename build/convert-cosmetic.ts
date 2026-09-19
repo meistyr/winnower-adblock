@@ -18,6 +18,7 @@
  * skipped — counted and reported so the gap stays visible.
  */
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { LISTS } from './lists.config.ts';
 import { BUCKETS, bucketOf, type CosmeticBucket } from '../src/shared/bucket.ts';
 
@@ -47,12 +48,17 @@ const CHUNK = 500;
  *
  * :is() takes the specificity of its most specific argument, and the html
  * prefix adds a little more. With !important that still wins in practice.
+ *
+ * 3. Provenance. HIDE_DECLARATION carries a marker as well as display:none, so
+ *    src/collapse.ts can tell a box winnower emptied from a box the page
+ *    emptied itself. Without it the collapser treated any hidden element as
+ *    proof of its own work and hid twitch.tv's video player.
  */
 function chunkToCss(selectors: string[]): string {
   const parts: string[] = [];
   for (let i = 0; i < selectors.length; i += CHUNK) {
     const group = selectors.slice(i, i + CHUNK).join(',\n');
-    parts.push(`html:not([data-winnower-off]) :is(\n${group}\n){display:none!important}`);
+    parts.push(`html:not([data-winnower-off]) :is(\n${group}\n)${HIDE_DECLARATION}`);
   }
   return parts.join('\n') + '\n';
 }
@@ -156,7 +162,11 @@ async function main() {
   // The computed form printed "83 rules" while the file still held one giant
   // rule, because chunkToCss was not actually wired in. A log line that
   // restates intent cannot detect that intent was not carried out.
-  const emittedRules = (css.match(/\{display:none!important\}/g) ?? []).length;
+  //
+  // Counted by splitting on the same constant chunkToCss emits, so changing the
+  // declaration cannot leave this silently matching nothing — which is what a
+  // hand-written pattern did the moment the marker was added to it.
+  const emittedRules = css.split(HIDE_DECLARATION).length - 1;
   console.log(`  generic selectors     ${genericList.length.toLocaleString().padStart(8)}   ${kb(css.length).padStart(5)} KB  in ${emittedRules} emitted rules`);
   console.log(`  domain selectors      ${specCount.toLocaleString().padStart(8)}`);
   console.log(`  domains covered       ${written.toLocaleString().padStart(8)}   across ${BUCKETS} buckets`);

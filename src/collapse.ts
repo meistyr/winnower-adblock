@@ -10,6 +10,8 @@
  * The switch is honoured here too: passes are scheduled before the worker's
  * reply arrives, so they check `off` rather than assume.
  */
+import { collapseVerdict } from './shared/collapse-match.ts';
+import { HID_MARKER } from './shared/constants.ts';
 
 /**
  * Publish how many wrappers are collapsed right now.
@@ -63,6 +65,31 @@ function restoreWronglyCollapsed(): number {
 let off = false;
 
 /**
+ * Did WINNOWER hide this element, as opposed to the page hiding its own?
+ *
+ * getComputedStyle answers what an element looks like, never who made it look
+ * that way, and that gap is what broke twitch.tv: the collapser accepted "the
+ * page hid one of its own divs" as proof that IT had emptied the box. So every
+ * winnower hide rule now carries HID_MARKER (src/shared/constants.ts) and this
+ * asks for the marker, not just the state.
+ *
+ * Custom properties inherit, so everything inside a hidden element reports the
+ * marker too. Harmless: a box containing such a descendant but not the marked
+ * element itself is necessarily INSIDE the marked element, which is already
+ * hidden, so collapsing there changes nothing on screen.
+ *
+ * Winnower's own collapses are deliberately not detected here. They are applied
+ * inline and carry no marker, which ends a ratchet: hiding a box used to make
+ * its parent qualify on the strength of that hide, and the parent's parent
+ * after that. On twitch.tv the marker-less chain reached the player slot.
+ */
+function isHiddenByWinnower(el: Element): boolean {
+  const s = getComputedStyle(el);
+  if (s.display !== 'none') return false;
+  return s.getPropertyValue(HID_MARKER).trim() === '1';
+}
+
+/**
  * Collapse wrappers left holding empty space after their ad child is hidden.
  *
  * Many sites generate their class names (The Verge ships `o1ls9u`, `o1ls91s` —
@@ -71,23 +98,21 @@ let off = false;
  * its own min-height: measured 2066x250, 800x90 and 380x250 holes on
  * theverge.com with every actual ad element correctly at height 0.
  *
- * Deliberately conservative — this is a heuristic and the failure mode is
- * eating real content:
- *   - requires a hidden descendant, so an empty box alone is never enough
- *   - refuses anything containing visible text, media, or a form control
- *   - refuses structural landmarks (main, article, nav, aside, ...)
- *   - ignores boxes too small to be a visible gap, or large enough to be a
- *     page-level container rather than an ad slot
+ * This function finds the boxes and reads their facts. Whether a box qualifies
+ * is src/shared/collapse-match.ts, which build/validate.ts runs against fixed
+ * shapes — so the judgement that has twice gone wrong here can be asked about
+ * directly instead of only observed in a browser afterwards.
  *
- * The guards are ordered cheapest-first on purpose. Measured on theverge.com:
- * of 3,088 candidates, 2,236 are rejected by one getBoundingClientRect and 750
- * more by innerText, leaving ~24 to reach the getComputedStyle walk over a
- * whole subtree. That ordering is why a full pass costs 16ms rather than
- * seconds. Move the expensive check earlier and it stops being viable.
+ * THE FACTS GO IN AS GETTERS, NOT VALUES. collapseVerdict reads them
+ * cheapest-first and returns at the first refusal, so an expensive fact is
+ * never computed for a box a cheap one already rejected. Measured on
+ * theverge.com: of 3,088 candidates, 2,236 die on the rect and 750 more on the
+ * text, leaving ~24 to reach the getComputedStyle walk. Pass a plain object of
+ * computed values instead and all 3,088 pay for all of it — 16ms per pass
+ * becomes seconds on a feed page.
  */
 function collapseEmptyWrappers(): number {
   if (off) return 0;
-  const KEEP = new Set(['BODY', 'HTML', 'MAIN', 'HEADER', 'FOOTER', 'NAV', 'ARTICLE', 'SECTION', 'ASIDE']);
   let collapsed = 0;
 
   restoreWronglyCollapsed();
@@ -101,44 +126,36 @@ function collapseEmptyWrappers(): number {
   // nothing, and contains something we hid.
   for (const node of document.querySelectorAll<HTMLElement>('div,span,section > div,li')) {
     if (node.dataset.winnowerCollapsed) continue;
-    if (KEEP.has(node.tagName)) continue;
 
-    const r = node.getBoundingClientRect();
-    if (r.height < 40 || r.width < 100) continue;      // too small to be a visible gap
-    if (r.height > 1400) continue;                      // page-level container, not a slot
+    // Both memoised: each is read more than once by the facts below, and each
+    // is a layout or a tree walk. Neither runs unless a fact that needs it is
+    // actually reached.
+    let rect: DOMRect | undefined;
+    const box = () => (rect ??= node.getBoundingClientRect());
+    let kids: NodeListOf<Element> | undefined;
+    const subtree = () => (kids ??= node.querySelectorAll('*'));
 
-    if ((node.innerText || '').trim().length > 2) continue;
-    if (node.querySelector('input,button,select,textarea,video,audio')) continue;
-
-    // Size and interactivity guards. Added after this pass collapsed YouTube's
-    // #guide-inner-content — the navigation menu, 45 links and 64 buttons —
-    // because a pass happened to run while the guide was still unpopulated:
-    // real height, no text yet, hidden children. It looked exactly like an
-    // emptied ad wrapper, and the collapse was permanent.
-    //
-    // An ad slot is a small, non-interactive leaf. Real UI is neither.
-    const subtree = node.querySelectorAll('*');
-    if (subtree.length > 20) continue;
-    if (node.querySelector('a[href]')) continue;
-    if (node.querySelector('[role],[tabindex],[aria-label]')) continue;
-
-    const hasMedia = [...node.querySelectorAll('img,svg,canvas,iframe,picture')].some((m) => {
-      const b = m.getBoundingClientRect();
-      return b.height > 8 && b.width > 8;
+    const verdict = collapseVerdict({
+      tagName: node.tagName,
+      get width() { return box().width; },
+      get height() { return box().height; },
+      get textLength() { return (node.innerText || '').trim().length; },
+      get hasFormOrMedia() { return !!node.querySelector('input,button,select,textarea,video,audio'); },
+      get subtreeCount() { return subtree().length; },
+      get hasAnchor() { return !!node.querySelector('a[href]'); },
+      get hasAriaOrRole() { return !!node.querySelector('[role],[tabindex],[aria-label]'); },
+      get hasVisibleMedia() {
+        return [...node.querySelectorAll('img,svg,canvas,iframe,picture')].some((m) => {
+          const b = m.getBoundingClientRect();
+          return b.height > 8 && b.width > 8;
+        });
+      },
+      get hasWinnowerHiddenDescendant() { return [...subtree()].some(isHiddenByWinnower); },
+      get seenBefore() { return !!node.dataset.winnowerCandidate; },
     });
-    if (hasMedia) continue;
 
-    // The deciding evidence: something inside it is hidden. An empty box with
-    // no hidden descendant is far more likely to be a spacer or a not-yet-
-    // populated container than a wrapper we emptied.
-    const hasHiddenChild = [...subtree].some((c) => getComputedStyle(c).display === 'none');
-    if (!hasHiddenChild) continue;
-
-    // Two strikes. A container that is merely slow to populate looks identical
-    // to an emptied ad wrapper on any single pass, so require it to still
-    // qualify on a later pass before acting. This is what stops the menu being
-    // hidden at all, rather than hidden and then restored.
-    if (!node.dataset.winnowerCandidate) {
+    if (verdict === 'skip') continue;
+    if (verdict === 'candidate') {
       node.dataset.winnowerCandidate = '1';
       continue;
     }
