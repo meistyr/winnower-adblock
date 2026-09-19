@@ -45,7 +45,7 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
       // Ad stitching configuration.
       { name: 'set-constant', args: ['ytInitialPlayerResponse.playerConfig.ssapConfig', 'undefined'] },
 
-      // Shorts. A separate ad path entirely — the watch-page rules do not cover
+      // Shorts. A separate ad path entirely: the watch-page rules do not cover
       // it, since Shorts ads arrive flagged on reel entries rather than as
       // adPlacements.
       { name: 'json-prune', args: ['entries.[-].command.reelWatchEndpoint.adClientParams.isAd'] },
@@ -62,7 +62,7 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
       // Pages that read google_ad_status expect it to be set once ads have loaded.
       { name: 'set-constant', args: ['google_ad_status', '1'] },
 
-      // SPA navigation — the inline payload only covers the first video.
+      // SPA navigation: the inline payload only covers the first video.
       {
         name: 'json-prune-fetch-response',
         args: [

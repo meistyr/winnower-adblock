@@ -7,8 +7,8 @@
  * and blocks nothing. So we assert something positive about each payload.
  *
  * Uses node:https with `agent: false` rather than global fetch(). Node 22's
- * bundled undici trips an uncatchable assertion — assert(!this.paused) in
- * Parser.finish — when it reuses a keep-alive socket against some hosts
+ * bundled undici trips an uncatchable assertion: assert(!this.paused) in
+ * Parser.finish, when it reuses a keep-alive socket against some hosts
  * (easylist.to, reproducibly, on the request after a large response). The
  * assertion fires from a TLSSocket event handler, so try/catch cannot contain
  * it; it takes the process down. `agent: false` opens a fresh connection per
@@ -87,7 +87,7 @@ function assertLooksLikeFilterList(text: string): number {
     throw new Error(`got HTML, not a filter list (bad URL or captive portal?)`);
   }
   const lines = text.split('\n').length;
-  if (lines < MIN_LINES) throw new Error(`only ${lines} lines — too short to be real`);
+  if (lines < MIN_LINES) throw new Error(`only ${lines} lines, too short to be real`);
   const filters = countFilters(text);
   if (filters === 0) throw new Error('parsed 0 actual filters');
   return filters;

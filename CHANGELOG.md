@@ -18,14 +18,14 @@ All notable changes to winnower are documented here. The format follows
 - **Diagnostics:** winnower now keeps a record of what it does, and the menu has a **Diagnostics**
   view with a **Copy** button. Errors are always recorded, so if a site breaks you can copy what
   happened and paste it into a report without setting anything up or making it happen again first.
-  **Developer mode** — five clicks on the version number at the bottom of the menu — records every
-  decision winnower makes rather than only the errors. Nothing is ever sent anywhere, and the
-  record is thrown away when you close your browser.
-- **New version notice:** winnower checks whether a newer version has been released — as soon as
-  you install it, and once a day after that.
+  **Developer mode**, which you turn on by clicking the version number at the bottom of the menu
+  five times, records every decision winnower makes rather than only the errors. Nothing is ever
+  sent anywhere, and the record is thrown away when you close your browser.
+- **New version notice:** winnower checks whether a newer version has been released, as soon as
+  you install it and once a day after that.
   When one has, the toolbar icon's badge turns green and the menu shows **0.3.0 available** at the
-  top, linking to the download. Chrome never updates winnower for you — it is installed from a
-  zip — so until now there was no way to find out a new version existed. This is the only time
+  top, linking to the download. Chrome never updates winnower for you, because it is installed
+  from a zip, so until now there was no way to find out a new version existed. This is the only time
   winnower contacts anything after you install it: it asks GitHub for the latest version number
   and nothing else, with no account, no identifier and nothing recorded about you.
 
@@ -39,8 +39,8 @@ All notable changes to winnower are documented here. The format follows
   also fixes the same mistake on any other site that keeps its video player outside the part of
   the page it appears in.
 - **Gaps left where ads were:** winnower now watches a page for as long as you have it open,
-  instead of stopping seven seconds after it loads. Ads that arrive late — on a slow connection,
-  or further down a page as you scroll — had their space left behind as an empty gap, because
+  instead of stopping seven seconds after it loads. Ads that arrive late, on a slow connection or
+  further down a page as you scroll, had their space left behind as an empty gap, because
   winnower had stopped looking by the time they appeared.
 
 ## [0.2.1] - 2026-09-18

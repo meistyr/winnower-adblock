@@ -53,7 +53,7 @@ for (const file of files) {
   try {
     rules = JSON.parse(await readFile(new URL(file, RULES_DIR), 'utf8'));
   } catch (err) {
-    problems.push(`${file}: not valid JSON — ${err instanceof Error ? err.message : String(err)}`);
+    problems.push(`${file}: not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
     continue;
   }
   if (!Array.isArray(rules)) {
@@ -70,7 +70,7 @@ for (const file of files) {
       break;
     }
     if (ids.has(r.id)) {
-      problems.push(`${file}: duplicate rule id ${r.id} — Chrome rejects the whole ruleset`);
+      problems.push(`${file}: duplicate rule id ${r.id}, Chrome rejects the whole ruleset`);
       break;
     }
     ids.add(r.id);
@@ -153,7 +153,7 @@ console.log('');
 // Counted two ways on purpose: every hide in the file, and every hide carrying
 // the full marked declaration. Equal means none slipped through unmarked. The
 // domain selectors are checked in build/check-switches.ts instead, by running
-// the built content script and reading what it injects — the marker is
+// the built content script and reading what it injects: the marker is
 // assembled at runtime there, so grepping the bundle would prove nothing.
 const genericCss = await readFile(new URL('cosmetic/generic.css', EXT_DIR), 'utf8');
 const hideBlocks = genericCss.split('display:none!important').length - 1;
@@ -162,7 +162,7 @@ console.log(`  hide rules marked   ${marked.toLocaleString().padStart(8)} / ${hi
 if (hideBlocks === 0) problems.push('generic.css contains no hide rules at all');
 if (marked !== hideBlocks) problems.push(`${hideBlocks - marked} hide rules in generic.css carry no ${HID_MARKER}; the collapser is blind to whatever they hide`);
 
-// The collapser's judgement, asked directly — it is the part that has gone
+// The collapser's judgement, asked directly. It is the part that has gone
 // wrong, twice, and neither failure was reachable from a browser test in time
 // to matter. Both directions asserted: a suite that only ever expects "skip"
 // passes just as loudly on a collapser that has stopped working entirely.
@@ -204,12 +204,12 @@ if (!alwaysKept) problems.push('the log does not keep errors regardless of devel
 // The reason is the column the whole feature exists for; a line that formats
 // without it is a line that says what happened and not why.
 const rendered = formatLine(ERR);
-const hasReason = rendered.includes('— boom') && rendered.includes('collapse') && rendered.includes('1.2s');
+const hasReason = rendered.includes(': boom') && rendered.includes('collapse') && rendered.includes('1.2s');
 console.log(`  ${hasReason ? 'ok  ' : 'FAIL'}  log: line carries time, layer and reason   ${JSON.stringify(rendered.trim())}`);
 if (!hasReason) problems.push(`a log line renders as ${JSON.stringify(rendered)}, missing its time, layer or reason`);
 
 // A grid of identical cards writes one line per card. Folding them keeps the
-// count without the wall of text — and must NOT fold across passes, or a box
+// count without the wall of text, and must NOT fold across passes, or a box
 // refused every pass would read as one event.
 const SAME = { t: 900, layer: 'collapse', verb: 'skip', subject: 'div.card', reason: 'contains a link' } as const;
 const folded = groupRepeats([
@@ -221,7 +221,7 @@ const foldedRight =
   folded.length === 3 && folded[0].count === 3 && folded[1].count === 1 && folded[2].count === 1;
 console.log(`  ${foldedRight ? 'ok  ' : 'FAIL'}  log: repeats folded, passes kept apart   ${folded.map((f) => `${f.subject}@${f.t}×${f.count}`).join(' ')}`);
 if (!foldedRight) problems.push('the log folds repeated lines incorrectly');
-// The update check's comparison. Text comparison is the trap here — "0.10.0"
+// The update check's comparison. Text comparison is the trap here: "0.10.0"
 // sorts BELOW "0.9.0" as a string, so the release that matters is the one that
 // never gets announced.
 const VERSIONS: [string, string, boolean][] = [
@@ -242,7 +242,7 @@ for (const [latest, current, want] of VERSIONS) {
 console.log('');
 
 // The kill switches, asked directly. Both of their known failures were invisible
-// from the top of a page, and neither can be provoked from a browser — see
+// from the top of a page, and neither can be provoked from a browser. See
 // build/check-switches.ts.
 const switches = await checkSwitches();
 for (const line of switches.lines) console.log(line);

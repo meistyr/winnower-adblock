@@ -36,7 +36,7 @@ declare const POPUP_PATTERNS: PopupPatterns;
         }
       }
     } catch {
-      /* unparseable URL — fall through to the real implementation */
+      /* unparseable URL: fall through to the real implementation */
     }
     return realOpen.apply(this, [url, ...rest]);
   };

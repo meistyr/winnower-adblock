@@ -4,7 +4,7 @@
  * winnower logged nothing at all until now: no console calls anywhere in src/,
  * and empty catch blocks, so a failure left no trace and the code carried on.
  * That is the right default for someone using it and a poor one for anyone
- * working on it — a reported broken site could only be investigated by driving
+ * working on it: a reported broken site could only be investigated by driving
  * a browser and inspecting the page by hand.
  *
  * Two levels, decided per line rather than per session:
@@ -14,7 +14,7 @@
  *     per decision is thousands of lines per page and names every site visited
  *
  * Nothing here touches chrome.* or the DOM, so it type-checks under both
- * tsconfigs and build/validate.ts can assert the formatting directly — the same
+ * tsconfigs and build/validate.ts can assert the formatting directly, the same
  * arrangement as shared/popup-match.ts and shared/collapse-match.ts.
  */
 
@@ -26,7 +26,7 @@ export type LogVerb =
   | 'blocked' | 'applied' | 'hid' | 'restored' | 'allowed' | 'paused' | 'skip' | 'error';
 
 export interface LogLine {
-  /** Milliseconds since this page — or the worker — started. */
+  /** Milliseconds since this page, or the worker, started. */
   t: number;
   layer: LogLayer;
   verb: LogVerb;
@@ -60,7 +60,7 @@ export interface GroupedLine extends LogLine {
  * Fold identical lines from the same pass into one, carrying a count.
  *
  * A pass walks the whole page, so a grid of twenty identical cards produces
- * twenty identical lines — theverge.com wrote `div.up4voo8 — contains visible
+ * twenty identical lines: theverge.com wrote `div.up4voo8: contains visible
  * media` twenty times in one pass, and twitch.tv's directory did the same for
  * every stream card. They are genuinely different elements, so they cannot be
  * deduplicated where they are recorded; but "this happened twenty times" is
@@ -87,7 +87,7 @@ export function groupRepeats(lines: readonly LogLine[]): GroupedLine[] {
   return out;
 }
 
-/** `802ms`, `1.2s` — short enough for a narrow column, precise enough to order by. */
+/** `802ms`, `1.2s`: short enough for a narrow column, precise enough to order by. */
 export function formatTime(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '—';
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -97,12 +97,12 @@ export function formatTime(ms: number): string {
  * One line, as it appears in the menu and on the clipboard.
  *
  * Fixed columns so a wall of these can be scanned down rather than read across:
- * when, which part, what it did, what it did it to — and the reason after the
- * dash.
+ * when, which part, what it did, what it did it to, and the reason after the
+ * colon.
  */
 export function formatLine(line: LogLine, count = 1): string {
   const when = formatTime(line.t).padStart(6);
-  const what = line.reason ? `${line.subject} — ${line.reason}` : line.subject;
+  const what = line.reason ? `${line.subject}: ${line.reason}` : line.subject;
   return `${when}  ${line.layer.padEnd(8)} ${line.verb.padEnd(8)} ${what}${count > 1 ? `  ×${count}` : ''}`;
 }
 
@@ -118,7 +118,7 @@ export function formatLog(lines: readonly LogLine[], header?: string): string {
   for (const line of groupRepeats(lines)) {
     if (line.host !== host) {
       host = line.host;
-      out.push('', `— ${host || 'winnower'} —`);
+      out.push('', `--- ${host || 'winnower'} ---`);
     }
     out.push(formatLine(line, line.count));
   }

@@ -1,5 +1,5 @@
 /**
- * winnower's content script (ISOLATED world — needs chrome.runtime).
+ * winnower's content script (ISOLATED world, needs chrome.runtime).
  *
  * Chrome injects this into every frame, top-level and embedded alike. It does
  * three things:
@@ -16,7 +16,7 @@
  *
  * The question this script asks names its OWN hostname. The worker deliberately
  * ignores that when deciding on or off, because an embedded frame reports
- * itself and a pause is scoped to the page — see the handler in src/sw.ts.
+ * itself and a pause is scoped to the page. See the handler in src/sw.ts.
  */
 import type { Message, Reply } from './shared/messages.ts';
 import { HIDE_DECLARATION } from './shared/constants.ts';
@@ -30,7 +30,7 @@ import * as log from './report.ts';
   collapse.start();
 
   // A content script's world goes away on navigation, taking anything still
-  // queued with it — and the last few lines before a page is left are usually
+  // queued with it, and the last few lines before a page is left are usually
   // the interesting ones.
   addEventListener('pagehide', () => log.flush(), { once: true });
 
@@ -50,8 +50,8 @@ import * as log from './report.ts';
   /** Gate generic.css off, and stop the collapser. Every "do not filter" path ends here. */
   function stepBack(): void {
     // The generic stylesheet is injected by the manifest and cannot be removed
-    // from here, but every rule in it is gated on html:not([data-winnower-off])
-    // — so this one attribute disables all of it.
+    // from here, but every rule in it is gated on html:not([data-winnower-off]),
+    // so this one attribute disables all of it.
     document.documentElement.dataset.winnowerOff = '1';
     collapse.disable();
   }
@@ -65,13 +65,13 @@ import * as log from './report.ts';
       // Out of attempts, so the switches cannot be read at all. Paused means
       // paused: step back entirely rather than risk filtering a site that was
       // paused. An ad slipping through is visible and fixes itself on the next
-      // load; a page quietly broken by a pause that did not take is neither —
-      // it gets blamed on the site, which is how this class of bug survives.
+      // load; a page quietly broken by a pause that did not take is neither.
+      // It gets blamed on the site, which is how this class of bug survives.
       //
       // Recorded as an error, so it is kept even with developer mode off. This
       // is precisely the state where winnower silently does nothing at all, and
       // until now it left no trace whatsoever.
-      log.report('cosmetic', 'error', location.hostname, `no reply from the worker after ${attempt} attempts — stepping back`);
+      log.report('cosmetic', 'error', location.hostname, `no reply from the worker after ${attempt} attempts, stepping back`);
       log.flush();
       stepBack();
       return;
@@ -115,7 +115,7 @@ import * as log from './report.ts';
     // documentElement exists at document_start; head may not yet.
     (document.head || document.documentElement).appendChild(style);
 
-    // One extra pass now that the domain rules are live — they may have just
+    // One extra pass now that the domain rules are live: they may have just
     // emptied a wrapper the earlier passes saw as still populated.
     collapse.pass();
 

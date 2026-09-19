@@ -57,7 +57,7 @@ const result = await build({
   keepNames: false,
   sourcemap: false,
   charset: 'utf8',
-  banner: { js: '/* winnower — generated from src/ by build/compile.ts. Do not edit. */\n"use strict";' },
+  banner: { js: '/* winnower: generated from src/ by build/compile.ts. Do not edit. */\n"use strict";' },
   define: { POPUP_PATTERNS: JSON.stringify(patterns) },
   metafile: true,
   logLevel: 'warning',

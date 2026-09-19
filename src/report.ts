@@ -3,7 +3,7 @@
  *
  * A page is where most of winnower's decisions happen and the one place it
  * cannot keep them: a content script's world is torn down on navigation. So
- * lines are batched here and handed to the worker, which holds them — see the
+ * lines are batched here and handed to the worker, which holds them. See the
  * log section of src/sw.ts.
  *
  * Batched rather than sent one at a time because a loading page reports in
@@ -56,7 +56,7 @@ export function flush(): void {
   try {
     // The callback exists only to read lastError. The worker answers this
     // message with nothing, so without one Chrome logs "message port closed"
-    // into the page's console — noise from a logger is a poor first impression.
+    // into the page's console, noise from a logger is a poor first impression.
     chrome.runtime.sendMessage({ type: 'winnower:log', lines } satisfies Message, () => {
       void chrome.runtime.lastError;
     });

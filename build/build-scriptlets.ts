@@ -17,7 +17,7 @@ async function main() {
   const built: Array<{ id: string; rules: number; of: number; kb: number }> = [];
   for (const group of SCRIPTLET_GROUPS) {
     const parts = [
-      `/* winnower — generated. Do not edit.`,
+      `/* winnower, generated. Do not edit.`,
       ` * group: ${group.id}`,
       ` * @adguard/scriptlets ${SCRIPTLETS_VERSION} (GPL-3.0)`,
       ` * regenerate: npm run scriptlets`,
@@ -37,7 +37,7 @@ async function main() {
           verbose: false,
         });
       } catch (err) {
-        console.error(`  ! ${group.id}: ${rule.name} failed — ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`  ! ${group.id}: ${rule.name} failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exitCode = 1;
         continue;
       }

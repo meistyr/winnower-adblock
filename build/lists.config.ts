@@ -3,13 +3,13 @@ import type { ListGroup } from '../src/shared/catalogue.ts';
 /**
  * Upstream filter lists, in the order they are applied.
  *
- * Two independent axes — these were conflated at first, and they are not the
+ * Two independent axes. These were conflated at first, and they are not the
  * same question:
  *
- * tier    — robustness priority. Tier 1 is what we want to keep if a second
+ * tier   , robustness priority. Tier 1 is what we want to keep if a second
  *           content blocker is ever installed and starts competing for the
  *           shared rule pool, leaving us only the 30,000 guaranteed minimum.
- * enabled — whether the ruleset is on by default. Blocking value, not
+ * enabled: whether the ruleset is on by default. Blocking value, not
  *           robustness. Lists that meaningfully break sites default to off.
  */
 export interface FilterList {
@@ -33,7 +33,7 @@ export const LISTS: readonly FilterList[] = [
     tier: 1,
     enabled: true,
     url: 'https://ublockorigin.github.io/uAssets/filters/filters.txt',
-    note: "uBlock Origin's own filters — highest signal per rule",
+    note: "uBlock Origin's own filters, highest signal per rule",
   },
   {
     name: 'ubo-badware',
@@ -41,7 +41,7 @@ export const LISTS: readonly FilterList[] = [
     tier: 1,
     enabled: true,
     url: 'https://ublockorigin.github.io/uAssets/filters/badware.txt',
-    note: 'Badware risks — malware/scam hosts',
+    note: 'Badware risks, malware/scam hosts',
   },
   {
     name: 'ubo-quick-fixes',
@@ -91,7 +91,7 @@ export const LISTS: readonly FilterList[] = [
     tier: 2,
     enabled: true,
     url: 'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext',
-    note: 'Ad/tracking server list — cheap, almost all plain domain blocks',
+    note: 'Ad/tracking server list, cheap, almost all plain domain blocks',
     title: "Peter Lowe's ad and tracking server list",
   },
   {
