@@ -6,6 +6,14 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Paused sites:** winnower's menu now lists every site you have paused, behind a **Paused
+  sites** button below "On this page". You can resume blocking on any of them straight from the
+  list, without visiting the site first. Until now the menu only ever told you about the site you
+  happened to be on, so the only way to find out whether you had paused something was to go there
+  and look.
+
 ### Fixed
 
 - **Twitch:** the video player no longer turns into a solid block of colour when you reload a

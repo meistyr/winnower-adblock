@@ -132,6 +132,42 @@
     background: var(--off-dim); color: var(--off); border: 1px solid rgba(224, 121, 95, 0.28);
   }
   .hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+
+  /* Full-width rows that move between the menu's two views. Styled to sit in
+     the same rhythm as a section — same padding and rule — so the menu still
+     reads as one stack rather than a button dropped into it. */
+  .nav-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; padding: 12px 16px; text-align: left;
+    background: none; border: 0; border-bottom: 1px solid var(--line);
+    color: var(--text); font: inherit; cursor: pointer;
+  }
+  .nav-row:hover:not(:disabled) { background: var(--surface); }
+  .nav-row:focus-visible { outline: 2px solid var(--on); outline-offset: -2px; }
+  /* Disabled when nothing is paused. Deliberately still shown: a control that
+     disappears when empty gives someone who paused a site last week nowhere to
+     look for it. */
+  .nav-row:disabled { cursor: default; color: var(--muted); }
+  .nav-row svg { flex: none; color: var(--faint); }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
+  .nav-count { font: 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* paused list */
+  .paused-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+  .paused-row + .paused-row { border-top: 1px solid var(--line); }
+  .paused-host {
+    font: 12px var(--mono); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .unpause {
+    flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+    background: none; border: 0; border-radius: 6px; padding: 0;
+    color: var(--muted); cursor: pointer;
+  }
+  .unpause:hover { background: var(--off-dim); color: var(--off); }
+  .unpause:focus-visible { outline: 2px solid var(--on); outline-offset: -2px; }
+  .empty { color: var(--muted); font-size: 12px; }
+
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -143,50 +179,76 @@
 
   <div class="banner" id="master-banner" hidden>Blocking is paused everywhere.</div>
 
-  <section>
-    <div class="site" id="site-card">
-      <div>
-        <div class="site-label" id="site-label">Blocking on this site</div>
-        <div class="site-sub" id="site-sub">Ads, trackers and popups</div>
+  <!-- Two views in one document, swapped by toggling [hidden]. The header and
+       footer sit outside both, so the menu keeps its identity and its version
+       on screen while you are looking at the list. -->
+  <div id="view-main">
+    <section>
+      <div class="site" id="site-card">
+        <div>
+          <div class="site-label" id="site-label">Blocking on this site</div>
+          <div class="site-sub" id="site-sub">Ads, trackers and popups</div>
+        </div>
+        <label class="switch" title="Toggle blocking on this site">
+          <input type="checkbox" id="site-toggle" aria-label="Blocking on this site">
+          <span class="track"></span>
+        </label>
       </div>
-      <label class="switch" title="Toggle blocking on this site">
-        <input type="checkbox" id="site-toggle" aria-label="Blocking on this site">
+
+      <div class="stats">
+        <div class="stat"><b id="stat-blocked">0</b><small>blocked on this tab</small></div>
+        <div class="stat"><b id="stat-rules">—</b><small>rules active</small></div>
+      </div>
+      <div class="hint" id="reload-hint" hidden>Reloading the page to apply…</div>
+    </section>
+
+    <section>
+      <h2>Filter lists</h2>
+      <div id="groups"></div>
+    </section>
+
+    <section>
+      <h2>On this page</h2>
+      <dl class="diag" id="diag">
+        <dt>Cosmetic rules</dt>    <dd id="d-cosmetic" class="na">—</dd>
+        <dt>Wrappers collapsed</dt><dd id="d-collapsed" class="na">—</dd>
+        <dt>YouTube</dt><dd id="d-scriptlets" class="na">—</dd>
+        <dt>Popups blocked</dt>    <dd id="d-popups" class="na">—</dd>
+      </dl>
+    </section>
+
+    <button class="nav-row" id="open-paused" type="button">
+      <span>Paused sites</span>
+      <span class="nav-right">
+        <span class="nav-count" id="paused-count">0</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+    </button>
+
+    <section class="foot">
+      <div class="row-label">
+        <span class="site-label">Master switch</span>
+        <span class="row-note">Pause winnower on every site</span>
+      </div>
+      <label class="switch" title="Pause or resume winnower everywhere">
+        <input type="checkbox" id="master-toggle" aria-label="Master switch">
         <span class="track"></span>
       </label>
-    </div>
+    </section>
+  </div>
 
-    <div class="stats">
-      <div class="stat"><b id="stat-blocked">0</b><small>blocked on this tab</small></div>
-      <div class="stat"><b id="stat-rules">—</b><small>rules active</small></div>
-    </div>
-    <div class="hint" id="reload-hint" hidden>Reloading the page to apply…</div>
-  </section>
+  <div id="view-paused" hidden>
+    <button class="nav-row" id="paused-back" type="button">
+      <span class="nav-right">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span>Paused sites</span>
+      </span>
+    </button>
 
-  <section>
-    <h2>Filter lists</h2>
-    <div id="groups"></div>
-  </section>
-
-  <section>
-    <h2>On this page</h2>
-    <dl class="diag" id="diag">
-      <dt>Cosmetic rules</dt>    <dd id="d-cosmetic" class="na">—</dd>
-      <dt>Wrappers collapsed</dt><dd id="d-collapsed" class="na">—</dd>
-      <dt>YouTube</dt><dd id="d-scriptlets" class="na">—</dd>
-      <dt>Popups blocked</dt>    <dd id="d-popups" class="na">—</dd>
-    </dl>
-  </section>
-
-  <section class="foot">
-    <div class="row-label">
-      <span class="site-label">Master switch</span>
-      <span class="row-note">Pause winnower on every site</span>
-    </div>
-    <label class="switch" title="Pause or resume winnower everywhere">
-      <input type="checkbox" id="master-toggle" aria-label="Master switch">
-      <span class="track"></span>
-    </label>
-  </section>
+    <section>
+      <div id="paused-list"></div>
+    </section>
+  </div>
 
   <!-- The GPL asks an interactive program to show its copyright, that there is no
        warranty, and where to read the licence; LICENSE.txt carries the last two. -->

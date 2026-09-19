@@ -147,6 +147,82 @@ function renderState(state: PopupState) {
   }
 }
 
+/**
+ * The paused-sites list, and the button that opens it.
+ *
+ * The allowlist has always been in PopupState — buildState in src/sw.ts puts it
+ * there — and this menu never rendered it, so the only way to find out whether
+ * a site was paused was to go and visit it. That cost a long detour once:
+ * amazon.com and amazon.co.uk are separate allowlist entries, and neither of us
+ * could see which one had been paused.
+ *
+ * Sorted rather than left in insertion order. The question this answers is "is
+ * X paused?", which is a scan, and storage keeps whatever order the toggles
+ * happened to land in.
+ */
+function renderPaused(state: PopupState) {
+  const sites = [...state.allowlist].sort((a, b) => a.localeCompare(b));
+
+  $('paused-count').textContent = String(sites.length);
+  // Disabled rather than hidden when empty: a control that vanishes gives
+  // someone who paused a site last week nowhere to look for it.
+  $<HTMLButtonElement>('open-paused').disabled = sites.length === 0;
+
+  const list = $('paused-list');
+  list.textContent = '';
+
+  if (!sites.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No sites are paused.';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const site of sites) {
+    const row = document.createElement('div');
+    row.className = 'paused-row';
+    row.innerHTML = `
+      <span class="paused-host"></span>
+      <button class="unpause" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>`;
+    // textContent, not interpolated into the innerHTML above: these strings come
+    // from storage and are shown back verbatim.
+    row.querySelector('.paused-host')!.textContent = site;
+    const button = row.querySelector<HTMLButtonElement>('.unpause')!;
+    button.title = `Resume blocking on ${site}`;
+    button.setAttribute('aria-label', `Resume blocking on ${site}`);
+    button.addEventListener('click', () => unpause(site, button));
+    list.appendChild(row);
+  }
+}
+
+/**
+ * Resume blocking on a site from the list.
+ *
+ * The reload is conditional, unlike every other toggle here. The site card and
+ * the master switch both act on the page you are looking at, so they reload it
+ * unconditionally; a site resumed from this list is usually NOT the open tab,
+ * and reloading it would throw away whatever you were doing for a change that
+ * does not affect it. Matched the way isAllowlisted does in src/sw.ts — exact
+ * host or subdomain — so the reload happens exactly when this page's filtering
+ * actually changed.
+ */
+async function unpause(site: string, button: HTMLButtonElement) {
+  button.disabled = true;
+  await send({ type: 'winnower:toggleSite', hostname: site });
+  if (hostname === site || hostname.endsWith('.' + site)) await reloadTab();
+  else await refresh();
+}
+
+/** Swap the two views, taking focus with them so the keyboard follows the eye. */
+function showPaused(show: boolean) {
+  $('view-main').hidden = show;
+  $('view-paused').hidden = !show;
+  $(show ? 'paused-back' : 'open-paused').focus();
+}
+
 async function countActiveRules(state: PopupState) {
   // Rule counts come from the build's stats file, filtered to what is enabled
   // right now — so this reflects the toggles, not the total ever built.
@@ -169,6 +245,7 @@ async function refresh() {
   const state = await send({ type: 'winnower:state', tabId: tab?.id, hostname });
   if (!state) return;
   renderState(state);
+  renderPaused(state);
   await countActiveRules(state);
   await renderDiagnostics();
 }
@@ -200,6 +277,9 @@ async function init() {
     await send({ type: 'winnower:toggleMaster' });
     await reloadTab();
   });
+
+  $('open-paused').addEventListener('click', () => showPaused(true));
+  $('paused-back').addEventListener('click', () => showPaused(false));
 
   await refresh();
 }
