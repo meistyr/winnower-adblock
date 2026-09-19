@@ -13,6 +13,12 @@ All notable changes to winnower are documented here. The format follows
   list, without visiting the site first. Until now the menu only ever told you about the site you
   happened to be on, so the only way to find out whether you had paused something was to go there
   and look.
+- **Diagnostics:** winnower now keeps a record of what it does, and the menu has a **Diagnostics**
+  view with a **Copy** button. Errors are always recorded, so if a site breaks you can copy what
+  happened and paste it into a report without setting anything up or making it happen again first.
+  **Developer mode** — five clicks on the version number at the bottom of the menu — records every
+  decision winnower makes rather than only the errors. Nothing is ever sent anywhere, and the
+  record is thrown away when you close your browser.
 
 ### Fixed
 

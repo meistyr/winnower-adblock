@@ -7,6 +7,7 @@
  * happened on the page you are looking at.
  */
 import type { BuildStats, ListGroup } from './shared/catalogue.ts';
+import { formatLog, formatTime, type LogLine } from './shared/log.ts';
 import type { Message, PopupState, Reply } from './shared/messages.ts';
 
 const GROUPS: ReadonlyArray<{ key: ListGroup; label: string; note: string }> = [
@@ -28,6 +29,8 @@ const send = <M extends Message>(msg: M) =>
 
 let tab: chrome.tabs.Tab | undefined;
 let hostname = '';
+/** Set by five clicks on the version; forgotten when the popup closes. */
+let devRevealed = false;
 
 interface PageDiagnostics {
   cosmetic: number | null;
@@ -111,6 +114,12 @@ function renderState(state: PopupState) {
 
   $<HTMLInputElement>('master-toggle').checked = state.master;
   $('master-banner').hidden = state.master;
+
+  // Stays on screen once developer mode is on, so it can be turned off again
+  // without remembering how it was turned on.
+  $<HTMLInputElement>('dev-toggle').checked = state.dev;
+  $('dev-row').hidden = !(state.dev || devRevealed);
+  $('diag-count').textContent = state.recorded.toLocaleString();
 
   $('stat-blocked').textContent = state.blocked.toLocaleString();
 
@@ -216,11 +225,80 @@ async function unpause(site: string, button: HTMLButtonElement) {
   else await refresh();
 }
 
-/** Swap the two views, taking focus with them so the keyboard follows the eye. */
-function showPaused(show: boolean) {
-  $('view-main').hidden = show;
-  $('view-paused').hidden = !show;
-  $(show ? 'paused-back' : 'open-paused').focus();
+type View = 'main' | 'paused' | 'diag';
+
+/**
+ * Swap views, taking focus with them so the keyboard follows the eye.
+ *
+ * The caller names what to focus rather than this working it out: returning to
+ * the menu should land on the row you left through, and only the caller knows
+ * which one that was.
+ */
+function showView(view: View, focusId: string) {
+  $('view-main').hidden = view !== 'main';
+  $('view-paused').hidden = view !== 'paused';
+  $('view-diag').hidden = view !== 'diag';
+  $(focusId).focus();
+}
+
+// --- the diagnostic log ------------------------------------------------------
+
+/** Held so Copy sends exactly what is on screen, rather than re-asking. */
+let logLines: LogLine[] = [];
+
+/** Briefly say what a button just did, then put its label back. */
+function flash(button: HTMLElement, text: string) {
+  const original = button.textContent;
+  button.textContent = text;
+  setTimeout(() => { button.textContent = original; }, 1200);
+}
+
+function renderLog() {
+  const list = $('diag-list');
+  list.textContent = '';
+
+  if (!logLines.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Nothing recorded yet.';
+    list.appendChild(empty);
+    return;
+  }
+
+  // Grouped by site, same as the copied text: a log is read by someone working
+  // out which page each run belongs to.
+  let host: string | undefined;
+  for (const line of logLines) {
+    if (line.host !== host) {
+      host = line.host;
+      const heading = document.createElement('div');
+      heading.className = 'log-host';
+      heading.textContent = host || 'winnower';
+      list.appendChild(heading);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'log-line';
+    row.innerHTML = '<span class="log-t"></span><span class="log-layer"></span><span class="log-verb"></span><span class="log-msg"></span>';
+    const text = line.reason ? `${line.subject} — ${line.reason}` : line.subject;
+    row.querySelector('.log-t')!.textContent = formatTime(line.t);
+    row.querySelector('.log-layer')!.textContent = line.layer;
+    const verb = row.querySelector('.log-verb')!;
+    verb.textContent = line.verb;
+    verb.classList.add(line.verb);
+    row.querySelector('.log-msg')!.textContent = text;
+    // The column is one line and these run long; the full text on hover beats
+    // wrapping every row and losing the shape of the table.
+    row.title = text;
+    list.appendChild(row);
+  }
+}
+
+async function openLog() {
+  const answer = await send({ type: 'winnower:diagnostics' });
+  logLines = answer?.lines ?? [];
+  renderLog();
+  showView('diag', 'diag-back');
 }
 
 async function countActiveRules(state: PopupState) {
@@ -278,8 +356,48 @@ async function init() {
     await reloadTab();
   });
 
-  $('open-paused').addEventListener('click', () => showPaused(true));
-  $('paused-back').addEventListener('click', () => showPaused(false));
+  $('open-paused').addEventListener('click', () => showView('paused', 'paused-back'));
+  $('paused-back').addEventListener('click', () => showView('main', 'open-paused'));
+  $('open-diag').addEventListener('click', () => void openLog());
+  $('diag-back').addEventListener('click', () => showView('main', 'open-diag'));
+
+  $('diag-copy').addEventListener('click', async () => {
+    const header = `winnower v${chrome.runtime.getManifest().version} — ${logLines.length} lines`;
+    try {
+      await navigator.clipboard.writeText(formatLog(logLines, header));
+      flash($('diag-copy'), 'Copied');
+    } catch {
+      // Denied, or no clipboard in this context. Saying so beats a button that
+      // silently did nothing, which reads as the log being empty.
+      flash($('diag-copy'), 'Blocked');
+    }
+  });
+
+  $('diag-clear').addEventListener('click', async () => {
+    await send({ type: 'winnower:clearDiagnostics' });
+    logLines = [];
+    renderLog();
+    await refresh();
+  });
+
+  // Reloads, like the other switches: a page learns whether to record at
+  // document_start, so the one you are looking at only starts once it reloads.
+  $('dev-toggle').addEventListener('change', async () => {
+    await send({ type: 'winnower:toggleDev' });
+    await reloadTab();
+  });
+
+  // Five clicks on the version reveal developer mode — the Android gesture.
+  // Nothing advertises it, which is the point: it is for whoever is working on
+  // winnower, and everyone else gets the errors without touching anything.
+  let versionClicks = 0;
+  $('version').addEventListener('click', () => {
+    if (devRevealed) return;
+    if ((versionClicks += 1) < 5) return;
+    devRevealed = true;
+    $('dev-row').hidden = false;
+    $('dev-row').scrollIntoView({ block: 'nearest' });
+  });
 
   await refresh();
 }

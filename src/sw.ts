@@ -16,6 +16,7 @@
 import { bucketOf, type CosmeticBucket } from './shared/bucket.ts';
 import { ALLOWLIST_PRIORITY, ALLOWLIST_RULE_BASE } from './shared/constants.ts';
 import type { DynamicScript, RulesetEntry } from './shared/catalogue.ts';
+import { LOG_CAP, isAlwaysKept, type LogLine } from './shared/log.ts';
 import type { Message, MessageType, PopupState, Reply } from './shared/messages.ts';
 
 const bucketCache = new Map<number, CosmeticBucket>();
@@ -62,16 +63,82 @@ async function selectorsFor(hostname: string): Promise<string[]> {
 interface Settings {
   allowlist: string[];
   master: boolean;
+  /** Record every decision, not only errors. Off unless someone turned it on. */
+  dev: boolean;
 }
 
-const defaults: Settings = { allowlist: [], master: true };
+const defaults: Settings = { allowlist: [], master: true, dev: false };
 
 async function getSettings(): Promise<Settings> {
   const s: Partial<Settings> = await chrome.storage.local.get(defaults);
-  return { allowlist: s.allowlist ?? [], master: s.master !== false };
+  return { allowlist: s.allowlist ?? [], master: s.master !== false, dev: s.dev === true };
 }
 
 const normalise = (h: string | undefined) => String(h || '').replace(/^www\./, '').toLowerCase();
+
+// --- the diagnostic log -----------------------------------------------------
+
+/**
+ * The recorded lines, oldest first.
+ *
+ * Held in memory and mirrored into chrome.storage.session. MV3 stops an idle
+ * worker within seconds, and a log that vanished each time it went quiet would
+ * never still contain the thing you opened the menu to look at. `session`
+ * rather than `local`: it is dropped when the browser closes, and a record of
+ * every site visited has no business outliving the session that produced it.
+ */
+let logLines: LogLine[] = [];
+let logLoaded = false;
+let logFlush: ReturnType<typeof setTimeout> | undefined;
+
+async function loadLog(): Promise<void> {
+  if (logLoaded) return;
+  logLoaded = true;
+  try {
+    const { winnowerLog } = await chrome.storage.session.get({ winnowerLog: [] });
+    if (Array.isArray(winnowerLog)) logLines = winnowerLog as LogLine[];
+  } catch {
+    /* session storage unavailable — carry on with the in-memory copy */
+  }
+}
+
+/** Mirror to session storage, debounced: a loading page reports in bursts. */
+function flushLog(): void {
+  if (logFlush !== undefined) return;
+  logFlush = setTimeout(() => {
+    logFlush = undefined;
+    chrome.storage.session.set({ winnowerLog: logLines }).catch(() => {});
+  }, 400);
+}
+
+/**
+ * Keep some lines, subject to the level.
+ *
+ * The developer-mode check lives HERE, not at each call site, so that "errors
+ * are always kept" is true of every path into the log rather than of the paths
+ * someone remembered. Senders filter too — a page that recorded everything and
+ * shipped it here to be discarded would have paid the cost regardless — but
+ * this is the backstop.
+ *
+ * The host is taken from the sender, never from the message: winnower listens
+ * on every site, so a page can send whatever it likes.
+ */
+async function record(lines: LogLine[], host?: string): Promise<void> {
+  if (!lines.length) return;
+  await loadLog();
+  const { dev } = await getSettings();
+  const keep = lines.filter((line) => dev || isAlwaysKept(line));
+  if (!keep.length) return;
+  for (const line of keep) logLines.push(host ? { ...line, host } : line);
+  if (logLines.length > LOG_CAP) logLines = logLines.slice(-LOG_CAP);
+  flushLog();
+}
+
+const workerStart = Date.now();
+
+/** Record one line about the worker's own behaviour. */
+const note = (verb: LogLine['verb'], subject: string, reason?: string) =>
+  void record([{ t: Date.now() - workerStart, layer: 'worker', verb, subject, reason }]).catch(() => {});
 
 async function isAllowlisted(hostname: string): Promise<boolean> {
   const { allowlist, master } = await getSettings();
@@ -222,7 +289,8 @@ chrome.tabs.onRemoved.addListener((tabId) => blockedByTab.delete(tabId));
 // --- messages ---------------------------------------------------------------
 
 async function buildState(tabId: number | undefined, hostname: string): Promise<PopupState> {
-  const { allowlist, master } = await getSettings();
+  const { allowlist, master, dev } = await getSettings();
+  await loadLog();
   const enabled = await chrome.declarativeNetRequest.getEnabledRulesets();
   let catalogue: RulesetEntry[] = [];
   try {
@@ -236,6 +304,8 @@ async function buildState(tabId: number | undefined, hostname: string): Promise<
     allowlist,
     blocked: (tabId === undefined ? undefined : blockedByTab.get(tabId)) ?? 0,
     rulesets: catalogue.map((r) => ({ ...r, enabled: enabled.includes(r.id) })),
+    dev,
+    recorded: logLines.length,
   };
 }
 
@@ -275,13 +345,18 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       // it is on, it steps back rather than risk filtering one someone paused.
       // Falling back to the frame's own hostname would reinstate exactly the
       // bug above — a third-party box answering for itself.
+      // Rides along with the selectors rather than costing a second round
+      // trip: the page has to know at document_start whether to record
+      // anything, and it is already asking this question then.
+      const { dev } = await getSettings();
+
       if (site === null || (await isAllowlisted(site))) {
-        reply({ selectors: [], off: true });
+        reply({ selectors: [], off: true, dev });
         return;
       }
       // Selectors stay keyed to the frame's own hostname: cosmetic rules are
       // written per frame domain, not per top-level site.
-      reply({ selectors: await selectorsFor(String(msg.hostname || '')), off: false });
+      reply({ selectors: await selectorsFor(String(msg.hostname || '')), off: false, dev });
     })().catch(() =>
       // The decision could not be completed — in practice chrome.storage
       // failing because the extension context was invalidated by a reload or
@@ -289,7 +364,7 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       // message, so both paths answer it the same way: paused means paused,
       // and an unreadable setting is not grounds for filtering a page someone
       // may have paused.
-      reply({ selectors: [], off: true }),
+      reply({ selectors: [], off: true, dev: false }),
     );
     return true;
   }
@@ -297,6 +372,61 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
   if (msg?.type === 'winnower:state') {
     const reply = replyFor(msg.type, sendResponse);
     buildState(msg.tabId, msg.hostname).then(reply).catch(() => reply(null));
+    return true;
+  }
+
+  if (msg?.type === 'winnower:log') {
+    // The site is read off the sender, never off the message. winnower listens
+    // on every site, so the lines themselves are whatever a page chose to send;
+    // the label saying where they came from must not be.
+    let host: string | undefined;
+    try {
+      if (sender.tab?.url) host = new URL(sender.tab.url).hostname;
+    } catch {
+      /* unparseable — the lines are still worth keeping, just unattributed */
+    }
+    // Capped before it reaches record(), so one page cannot flush the buffer
+    // of everything else by sending an enormous batch.
+    const lines = Array.isArray(msg.lines) ? msg.lines.slice(0, LOG_CAP) : [];
+    void record(lines, host).catch(() => {});
+    return false; // nothing to answer; the sender does not wait
+  }
+
+  if (msg?.type === 'winnower:diagnostics') {
+    const reply = replyFor(msg.type, sendResponse);
+    (async () => {
+      await loadLog();
+      const { dev } = await getSettings();
+      reply({ lines: logLines.slice(), dev });
+    })().catch(() => reply(null));
+    return true;
+  }
+
+  if (msg?.type === 'winnower:clearDiagnostics') {
+    const reply = replyFor(msg.type, sendResponse);
+    (async () => {
+      logLines = [];
+      logLoaded = true;
+      try {
+        await chrome.storage.session.set({ winnowerLog: [] });
+      } catch {
+        /* cleared in memory regardless */
+      }
+      reply({ recorded: 0 });
+    })().catch(() => reply(null));
+    return true;
+  }
+
+  if (msg?.type === 'winnower:toggleDev') {
+    const reply = replyFor(msg.type, sendResponse);
+    (async () => {
+      const { dev } = await getSettings();
+      await chrome.storage.local.set({ dev: !dev });
+      // Recorded before the reply so the first line in a fresh log says when
+      // recording started, which is the question you ask of a log's first line.
+      note('applied', `developer mode ${dev ? 'off' : 'on'}`);
+      reply({ dev: !dev });
+    })().catch(() => reply(null));
     return true;
   }
 

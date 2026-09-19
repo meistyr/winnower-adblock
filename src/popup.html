@@ -168,6 +168,44 @@
   .unpause:focus-visible { outline: 2px solid var(--on); outline-offset: -2px; }
   .empty { color: var(--muted); font-size: 12px; }
 
+  /* diagnostics */
+  .log { font: 11px var(--mono); }
+  .log-line {
+    display: grid; grid-template-columns: 40px 50px 46px 1fr; gap: 7px;
+    padding: 4px 0; border-bottom: 1px solid var(--line); align-items: baseline;
+  }
+  .log-line:last-child { border-bottom: 0; }
+  .log-t { color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+  .log-layer { color: var(--muted); }
+  /* Acted on, deliberately left alone, went wrong. */
+  .log-verb { color: var(--on); }
+  .log-verb.skip, .log-verb.paused { color: var(--faint); }
+  .log-verb.blocked, .log-verb.error { color: var(--off); }
+  /* Wraps rather than truncating. The reason after the dash is the column this
+     whole feature exists for, and at 336px an ellipsis eats it every time —
+     "div.channel-root__p…" is precisely the line you needed to read. The first
+     three columns stay aligned because the row is a grid baselined to its top. */
+  .log-msg { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+  .log-host { color: var(--muted); font-size: 10.5px; padding: 8px 0 3px; border-bottom: 1px solid var(--line); }
+
+  .copy-btn {
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 3px 10px; font: 11px var(--sans); cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--surface); }
+  .copy-btn:focus-visible { outline: 2px solid var(--on); outline-offset: 2px; }
+
+  /* Developer mode and Diagnostics sit BELOW the master switch, so the master
+     switch is no longer the last section and needs its rule back; whatever ends
+     up at the bottom loses one instead. Without this the stack has a missing
+     line in the middle of it. */
+  #view-main section:last-of-type { border-bottom: 1px solid var(--line); }
+  #view-main > *:last-child { border-bottom: 0; }
+
+  /* Five clicks reveal developer mode. Nothing hints at it, but the cursor
+     should not claim the version is an ordinary link either. */
+  .version { cursor: default; -webkit-user-select: none; user-select: none; }
+
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -235,6 +273,31 @@
         <span class="track"></span>
       </label>
     </section>
+
+    <!-- Hidden until five clicks on the version. Recording every decision is
+         for whoever is working on winnower, not for the people using it, so it
+         does not take permanent space in a menu that is already full. -->
+    <section class="foot" id="dev-row" hidden>
+      <div class="row-label">
+        <span class="site-label">Developer mode</span>
+        <span class="row-note">Records what winnower does. Nothing is sent anywhere.</span>
+      </div>
+      <label class="switch" title="Record every decision, not only errors">
+        <input type="checkbox" id="dev-toggle" aria-label="Developer mode">
+        <span class="track"></span>
+      </label>
+    </section>
+
+    <!-- Always present, because errors are recorded whether or not developer
+         mode is on: someone reporting a broken site has something to copy
+         without first turning anything on and reproducing it. -->
+    <button class="nav-row" id="open-diag" type="button">
+      <span>Diagnostics</span>
+      <span class="nav-right">
+        <span class="nav-count" id="diag-count">0</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+    </button>
   </div>
 
   <div id="view-paused" hidden>
@@ -247,6 +310,28 @@
 
     <section>
       <div id="paused-list"></div>
+    </section>
+  </div>
+
+  <div id="view-diag" hidden>
+    <button class="nav-row" id="diag-back" type="button">
+      <span class="nav-right">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span>Diagnostics</span>
+      </span>
+      <!-- Inside the back button's row but not inside the button itself: a
+           button cannot contain a button, and these two do different things. -->
+    </button>
+    <div class="nav-row" style="cursor:default">
+      <span class="row-note">Newest last. Nothing leaves this machine.</span>
+      <span class="nav-right">
+        <button class="copy-btn" id="diag-copy" type="button">Copy</button>
+        <button class="copy-btn" id="diag-clear" type="button">Clear</button>
+      </span>
+    </div>
+
+    <section>
+      <div class="log" id="diag-list"></div>
     </section>
   </div>
 

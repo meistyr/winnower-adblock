@@ -27,7 +27,7 @@ export interface CheckResult {
   problems: string[];
 }
 
-type Reply = { selectors: string[]; off: boolean };
+type Reply = { selectors: string[]; off: boolean; dev: boolean };
 type Listener = (msg: unknown, sender: unknown, respond: (r: Reply) => void) => void;
 
 const noopEvent = { addListener: () => {} };
@@ -51,6 +51,14 @@ async function loadWorker(allowlist: string[], failStorage = false): Promise<Lis
           if (failStorage) throw new Error('Extension context invalidated.');
           return { allowlist, master: true };
         },
+        set: async () => {},
+      },
+      // The worker mirrors its diagnostic log into session storage. Absent, the
+      // mirror throws from inside a timer, which surfaces as an unhandled
+      // rejection in the build rather than as a failed check.
+      session: {
+        get: async () => ({ winnowerLog: [] }),
+        set: async () => {},
       },
     },
     declarativeNetRequest: {
@@ -135,7 +143,15 @@ async function runContentScript(failures: number, reply: Reply) {
   const chrome = {
     runtime: {
       lastError: undefined as { message: string } | undefined,
-      sendMessage(_msg: unknown, cb: (r: Reply | undefined) => void) {
+      sendMessage(msg: { type?: string } | undefined, cb: (r: Reply | undefined) => void) {
+        // Only the cosmetic question is under test. The content script also
+        // posts batches of diagnostic lines, and counting those would make the
+        // retry assertion depend on how much it happened to record — which is
+        // exactly what it started doing the moment logging was added.
+        if (msg?.type !== 'winnower:cosmetic') {
+          cb(undefined);
+          return;
+        }
         sends += 1;
         const lost = sends <= failures;
         // Set on every send, not just the failing ones: setTimeout fires
@@ -150,7 +166,7 @@ async function runContentScript(failures: number, reply: Reply) {
 
   const run = new Function(
     'chrome', 'document', 'location', 'getComputedStyle', 'setTimeout', 'clearTimeout',
-    'MutationObserver', 'console', code,
+    'MutationObserver', 'addEventListener', 'console', code,
   ) as (...a: unknown[]) => void;
 
   run(
@@ -168,6 +184,9 @@ async function runContentScript(failures: number, reply: Reply) {
     // and Node has neither — without them content.js throws a ReferenceError
     // before a single check runs, which reads as a broken harness, not a bug.
     class { observe() {} disconnect() {} takeRecords() { return []; } },
+    // The content script flushes its diagnostic log on pagehide, so the global
+    // addEventListener has to exist here too.
+    () => {},
     { log: () => {}, error: () => {} },
   );
 
@@ -217,16 +236,16 @@ export async function checkSwitches(): Promise<CheckResult> {
   note(unreadable.off, 'steps back if settings unreadable', `off=${unreadable.off}`);
 
   // --- the content script, when the worker misses a message ---
-  const givesUp = await runContentScript(3, { selectors: [], off: true });
+  const givesUp = await runContentScript(3, { selectors: [], off: true, dev: false });
   note(givesUp.sends > 1, 'asks again after a lost message', `${givesUp.sends} attempts`);
 
-  const recovers = await runContentScript(2, { selectors: [], off: true });
+  const recovers = await runContentScript(2, { selectors: [], off: true, dev: false });
   note(recovers.switchApplied, 'applies the switch after retrying', `attempts=${recovers.sends}, applied=${recovers.switchApplied}`);
 
   // When every attempt is lost the switches cannot be read at all, so winnower
   // steps back rather than risk filtering a paused site. data-winnower-off MUST
   // be set here, which turns off every rule in generic.css.
-  const exhausted = await runContentScript(99, { selectors: [], off: true });
+  const exhausted = await runContentScript(99, { selectors: [], off: true, dev: false });
   note(exhausted.switchApplied && exhausted.sends === 4, 'steps back if every try is lost', `attempts=${exhausted.sends}, applied=${exhausted.switchApplied}`);
 
   // --- the provenance marker on the rules the content script injects ---
@@ -235,7 +254,7 @@ export async function checkSwitches(): Promise<CheckResult> {
   // that hid without marking would leave the collapser blind to precisely the
   // boxes those selectors just emptied, and nothing would error — it would
   // quietly collapse less. generic.css is asserted separately in validate.ts.
-  const injected = await runContentScript(0, { selectors: ['.ad-slot', '.promo'], off: false });
+  const injected = await runContentScript(0, { selectors: ['.ad-slot', '.promo'], off: false, dev: false });
   const marked = injected.injectedCss.includes(HIDE_DECLARATION);
   note(marked, 'domain rules carry the hide marker', marked ? HIDE_DECLARATION : `injected ${JSON.stringify(injected.injectedCss.slice(-40))}`);
 

@@ -12,6 +12,15 @@
  */
 import { collapseVerdict } from './shared/collapse-match.ts';
 import { HID_MARKER } from './shared/constants.ts';
+import { report } from './report.ts';
+
+/** A short label for a box, for the diagnostic log. */
+function describe(node: HTMLElement): string {
+  const classes = typeof node.className === 'string' && node.className
+    ? '.' + node.className.trim().split(/\s+/).slice(0, 2).join('.')
+    : '';
+  return node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') + classes;
+}
 
 /**
  * Publish how many wrappers are collapsed right now.
@@ -54,6 +63,7 @@ function restoreWronglyCollapsed(): number {
     node.style.removeProperty('display');
     delete node.dataset.winnowerCollapsed;
     restored += 1;
+    report('collapse', 'restored', describe(node), 'gained real content');
   }
   if (restored) publishCount();
   return restored;
@@ -143,7 +153,7 @@ function collapseEmptyWrappers(): PassResult {
     let kids: NodeListOf<Element> | undefined;
     const subtree = () => (kids ??= node.querySelectorAll('*'));
 
-    const verdict = collapseVerdict({
+    const judged = collapseVerdict({
       tagName: node.tagName,
       get width() { return box().width; },
       get height() { return box().height; },
@@ -162,8 +172,13 @@ function collapseEmptyWrappers(): PassResult {
       get seenBefore() { return !!node.dataset.winnowerCandidate; },
     });
 
-    if (verdict === 'skip') continue;
-    if (verdict === 'candidate') {
+    if (judged.verdict === 'skip') {
+      // Only the late refusals. 94% of boxes are rejected on size or text, and
+      // a line for each would bury the handful worth reading.
+      if (judged.noteworthy) report('collapse', 'skip', describe(node), judged.reason);
+      continue;
+    }
+    if (judged.verdict === 'candidate') {
       node.dataset.winnowerCandidate = '1';
       candidates += 1;
       continue;
@@ -172,6 +187,7 @@ function collapseEmptyWrappers(): PassResult {
     node.dataset.winnowerCollapsed = '1';
     node.style.setProperty('display', 'none', 'important');
     collapsed += 1;
+    report('collapse', 'hid', describe(node), `${Math.round(box().width)}×${Math.round(box().height)} ${judged.reason}`);
   }
   if (collapsed) publishCount();
   return { collapsed, candidates, restored };

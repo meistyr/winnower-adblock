@@ -11,6 +11,7 @@ import type { PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
 import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/collapse-match.ts';
+import { formatLine, isAlwaysKept, type LogLine } from '../src/shared/log.ts';
 import { checkSwitches } from './check-switches.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
@@ -185,10 +186,26 @@ const SHAPES: [string, BoxFacts, Verdict][] = [
   ['a box showing text', { ...AD_WRAPPER, textLength: 40 }, 'skip'],
 ];
 for (const [label, facts, want] of SHAPES) {
-  const got = collapseVerdict(facts);
+  const got = collapseVerdict(facts).verdict;
   console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  collapser: ${label.padEnd(30)} ${got}`);
   if (got !== want) problems.push(`the collapser answers "${got}" for ${label}, expected "${want}"`);
 }
+
+// The diagnostic log. "Errors are always kept" is the promise that lets someone
+// report a broken site without first turning developer mode on and reproducing
+// it, so assert it rather than trusting the call sites to have remembered.
+const ERR: LogLine = { t: 1243, layer: 'collapse', verb: 'error', subject: 'div.thing', reason: 'boom' };
+const ORDINARY: LogLine = { ...ERR, verb: 'skip' };
+const alwaysKept = isAlwaysKept(ERR) && !isAlwaysKept(ORDINARY);
+console.log(`  ${alwaysKept ? 'ok  ' : 'FAIL'}  log: errors kept, ordinary lines not`);
+if (!alwaysKept) problems.push('the log does not keep errors regardless of developer mode');
+
+// The reason is the column the whole feature exists for; a line that formats
+// without it is a line that says what happened and not why.
+const rendered = formatLine(ERR);
+const hasReason = rendered.includes('— boom') && rendered.includes('collapse') && rendered.includes('1.2s');
+console.log(`  ${hasReason ? 'ok  ' : 'FAIL'}  log: line carries time, layer and reason   ${JSON.stringify(rendered.trim())}`);
+if (!hasReason) problems.push(`a log line renders as ${JSON.stringify(rendered)}, missing its time, layer or reason`);
 console.log('');
 
 // The kill switches, asked directly. Both of their known failures were invisible

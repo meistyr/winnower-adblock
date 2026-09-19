@@ -21,12 +21,18 @@
 import type { Message, Reply } from './shared/messages.ts';
 import { HIDE_DECLARATION } from './shared/constants.ts';
 import * as collapse from './collapse.ts';
+import * as log from './report.ts';
 
 (() => {
   const STYLE_ID = 'winnower-cosmetic';
   if (document.getElementById(STYLE_ID)) return;
 
   collapse.start();
+
+  // A content script's world goes away on navigation, taking anything still
+  // queued with it — and the last few lines before a page is left are usually
+  // the interesting ones.
+  addEventListener('pagehide', () => log.flush(), { once: true });
 
   /**
    * Ask the worker for this frame's selectors, retrying a lost reply.
@@ -61,17 +67,31 @@ import * as collapse from './collapse.ts';
       // paused. An ad slipping through is visible and fixes itself on the next
       // load; a page quietly broken by a pause that did not take is neither —
       // it gets blamed on the site, which is how this class of bug survives.
+      //
+      // Recorded as an error, so it is kept even with developer mode off. This
+      // is precisely the state where winnower silently does nothing at all, and
+      // until now it left no trace whatsoever.
+      log.report('cosmetic', 'error', location.hostname, `no reply from the worker after ${attempt} attempts — stepping back`);
+      log.flush();
       stepBack();
       return;
     }
 
+    log.setDev(reply.dev === true);
+
     if (reply.off) {
+      log.report('cosmetic', 'paused', location.hostname, 'allowlisted, or the master switch is off');
+      log.flush();
       stepBack(); // allowlisted, or the master switch is off
       return;
     }
 
     const selectors = reply.selectors ?? [];
-    if (selectors.length === 0) return;
+    if (selectors.length === 0) {
+      log.report('cosmetic', 'applied', location.hostname, 'generic rules only, no rules for this site');
+      return;
+    }
+    log.report('cosmetic', 'applied', location.hostname, `${selectors.length} rules for this site`);
 
     // Chunked for the same reason as generic.css: Blink silently truncates an
     // over-long selector list in a single rule, and in CSS one invalid selector
