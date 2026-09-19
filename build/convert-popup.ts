@@ -1,7 +1,7 @@
 /**
  * Convert $popup filters into DNR rules.
  *
- * AdGuard's converter drops these — 3,017 of them — because DNR has no notion
+ * AdGuard's converter drops these, 3,017 of them, because DNR has no notion
  * of "this navigation is a popup". DNR classifies by resource type and
  * initiator, not by how a navigation began, so the information simply is not
  * in its model and mistranslating would be worse than refusing.
@@ -12,7 +12,7 @@
  * blocked. For domains that exist to serve popunders that is the right answer;
  * it is why this ships as its own ruleset that can be toggled off on its own.
  *
- * Popunders are the dominant ad format on free streaming sites — the window
+ * Popunders are the dominant ad format on free streaming sites. The window
  * that opens behind yours when you click play.
  */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -138,7 +138,7 @@ async function main() {
 
   await writeFile(OUT, JSON.stringify(rules), 'utf8');
 
-  // Hosts for the window.open guard — the JS-driven popunders never produce
+  // Hosts for the window.open guard: the JS-driven popunders never produce
   // a blockable navigation, because the page calls window.open() itself.
   //
   // The guard has only the host to go on, on every site, so it takes only

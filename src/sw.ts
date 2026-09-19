@@ -102,7 +102,7 @@ async function loadLog(): Promise<void> {
     const { winnowerLog } = await chrome.storage.session.get({ winnowerLog: [] });
     if (Array.isArray(winnowerLog)) logLines = winnowerLog as LogLine[];
   } catch {
-    /* session storage unavailable — carry on with the in-memory copy */
+    /* session storage unavailable, carry on with the in-memory copy */
   }
 }
 
@@ -120,8 +120,8 @@ function flushLog(): void {
  *
  * The developer-mode check lives HERE, not at each call site, so that "errors
  * are always kept" is true of every path into the log rather than of the paths
- * someone remembered. Senders filter too — a page that recorded everything and
- * shipped it here to be discarded would have paid the cost regardless — but
+ * someone remembered. Senders filter too, a page that recorded everything and
+ * shipped it here to be discarded would have paid the cost regardless, but
  * this is the backstop.
  *
  * The host is taken from the sender, never from the message: winnower listens
@@ -193,7 +193,7 @@ async function syncAllowRules() {
  *
  * These cannot live in the manifest. They run at document_start in the MAIN
  * world, with no chrome.storage and no synchronous signal available that
- * early, so they cannot consult the allowlist themselves — and a manifest
+ * early, so they cannot consult the allowlist themselves, and a manifest
  * declaration cannot be switched off. That is precisely why both kill switches
  * appeared broken on YouTube, whose blocking is entirely these scripts: the
  * network and cosmetic layers turned off correctly while ad payloads went on
@@ -273,14 +273,14 @@ interface UpdateCheck {
 /**
  * Ask GitHub for the newest release, at most once a day.
  *
- * Runs when the worker starts — which is whenever winnower is doing anything —
+ * Runs when the worker starts, which is whenever winnower is doing anything,
  * rather than only when the menu is opened, so someone who never opens the menu
  * still finds out. The day's interval is held in storage rather than in memory:
  * MV3 stops an idle worker within seconds, and an in-memory timestamp would
  * mean a check on every wake.
  *
  * Never throws and never surfaces a failure. Offline, rate-limited, GitHub
- * down — none of that is the reader's problem, and an extension complaining
+ * down, none of that is the reader's problem, and an extension complaining
  * that it could not check for updates is worse than one that quietly tries
  * again tomorrow. A failed attempt still moves checkedAt, so a machine with no
  * connection makes one attempt a day rather than one per worker wake.
@@ -294,7 +294,7 @@ async function checkUpdate(force = false): Promise<{ latest: string; newer: bool
       state = stored.updateCheck as UpdateCheck;
     }
   } catch {
-    /* unreadable settings — treat as never checked */
+    /* unreadable settings, treat as never checked */
   }
 
   if (force || Date.now() - (state.checkedAt || 0) > UPDATE_CHECK_INTERVAL_MS) {
@@ -331,7 +331,7 @@ function setBadge(tabId: number) {
   chrome.action
     .setBadgeBackgroundColor({ tabId, color: updatePending ? BADGE_UPDATE : BADGE_IDLE })
     .catch(() => {});
-  // Green badge, dark text — the brand green is light, and Chrome's default
+  // Green badge, dark text, the brand green is light, and Chrome's default
   // white on it is unreadable.
   chrome.action.setBadgeTextColor?.({ tabId, color: updatePending ? '#0f1a12' : '#ffffff' }).catch(() => {});
 }
@@ -353,7 +353,7 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
     // This event fires for every matched rule, allow rules included, and does
     // not report the action type. Without filtering, an allowlisted site would
     // count its own allowlist rule as a "block". _dynamic is the allowlist;
-    // ubo-unbreak is almost entirely exception rules. Approximate, not exact —
+    // ubo-unbreak is almost entirely exception rules. Approximate, not exact:
     // a handful of allow rules elsewhere can still be counted.
     const rs = info.rule?.rulesetId;
     if (rs === '_dynamic' || rs === 'ubo-unbreak') return;
@@ -412,7 +412,7 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       // The switches are scoped to the site in the address bar, not to the
       // frame asking. A cross-origin iframe reports its own hostname, so
       // checking that left every third-party frame on a paused page still
-      // filtered, while the network layer turned off correctly —
+      // filtered, while the network layer turned off correctly.
       // allowAllRequests matches the main-frame navigation and cascades to the
       // whole frame tree. sender.tab.url is the top-level document, which is
       // what was paused. Readable without the tabs permission because winnower
@@ -421,14 +421,14 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       try {
         if (sender.tab?.url) site = new URL(sender.tab.url).hostname;
       } catch {
-        /* unparseable top-level URL — leave site null and step back below */
+        /* unparseable top-level URL, leave site null and step back below */
       }
 
       // A null site means the page this frame belongs to could not be
       // identified. Paused means paused: when winnower cannot tell which site
       // it is on, it steps back rather than risk filtering one someone paused.
       // Falling back to the frame's own hostname would reinstate exactly the
-      // bug above — a third-party box answering for itself.
+      // bug above, a third-party box answering for itself.
       // Rides along with the selectors rather than costing a second round
       // trip: the page has to know at document_start whether to record
       // anything, and it is already asking this question then.
@@ -442,7 +442,7 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       // written per frame domain, not per top-level site.
       reply({ selectors: await selectorsFor(String(msg.hostname || '')), off: false, dev });
     })().catch(() =>
-      // The decision could not be completed — in practice chrome.storage
+      // The decision could not be completed, in practice chrome.storage
       // failing because the extension context was invalidated by a reload or
       // an update. That is the same event that loses the content script's
       // message, so both paths answer it the same way: paused means paused,
@@ -473,7 +473,7 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
     try {
       if (sender.tab?.url) host = new URL(sender.tab.url).hostname;
     } catch {
-      /* unparseable — the lines are still worth keeping, just unattributed */
+      /* unparseable, the lines are still worth keeping, just unattributed */
     }
     // Capped before it reaches record(), so one page cannot flush the buffer
     // of everything else by sending an enormous batch.
@@ -514,7 +514,7 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       await chrome.storage.local.set({ dev: !dev });
       // Kept whichever way it went. record() drops anything that is not an
       // error while developer mode is off, which would make the line saying
-      // recording STOPPED the first casualty of it stopping — leaving a log
+      // recording STOPPED the first casualty of it stopping, leaving a log
       // that simply ends, with nothing to say winnower had not died.
       //
       // Forced rather than ordered. The first attempt at this wrote the line
@@ -585,6 +585,6 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => { syncAll().catch(() => {}); });
 
 // At module scope rather than behind onStartup/onInstalled, so it runs whenever
-// the worker wakes — which is whenever winnower is doing anything. The day's
+// the worker wakes, which is whenever winnower is doing anything. The day's
 // interval lives in storage, so waking often costs nothing.
 void checkUpdate().catch(() => {});

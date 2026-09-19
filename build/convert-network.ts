@@ -2,7 +2,7 @@
  * Convert fetched ABP-syntax filter lists into DNR static rulesets.
  *
  * One ruleset per upstream list. The 50-enabled-ruleset cap counts rulesets,
- * not the rules inside them, so there is no reason to chunk — and per-list
+ * not the rules inside them, so there is no reason to chunk, and per-list
  * granularity is the granularity a human actually wants to toggle.
  *
  * Budget facts:
@@ -118,12 +118,12 @@ async function main() {
         `(${fmt(GUARANTEED_STATIC_RULES)} guaranteed + ~${fmt(SHARED_POOL)} shared pool).`,
     );
   }
-  if (tier1 + tier2 === 0) problems.push('converted 0 rules — the build produced nothing');
+  if (tier1 + tier2 === 0) problems.push('converted 0 rules: the build produced nothing');
 
   if (tier1 > GUARANTEED_STATIC_RULES) {
     warnings.push(
       `tier 1 is ${fmt(tier1)} rules, over the ${fmt(GUARANTEED_STATIC_RULES)} guaranteed minimum. ` +
-        `Fine while winnower is the only content blocker installed — it then draws on the ` +
+        `Fine while winnower is the only content blocker installed. It then draws on the ` +
         `full shared pool. Installing a second blocker would degrade this.`,
     );
   }

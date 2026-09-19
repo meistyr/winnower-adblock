@@ -2,7 +2,7 @@
  * winnower's empty-wrapper collapser (ISOLATED world, same as its caller).
  *
  * Kept apart from the content script because it is a different job. It never
- * reads a filter list and does not know what a selector is — it looks at the
+ * reads a filter list and does not know what a selector is. It looks at the
  * page's own geometry and guesses which empty boxes used to hold something
  * winnower hid. Every bug in this area has come from that guessing, so it earns
  * being readable on its own.
@@ -24,8 +24,8 @@ import { report } from './report.ts';
  * player slot was logged as `div.Layout-sc-1xcs6mc-0.imqbpe`, when the class
  * worth reading was `channel-page__video-player`.
  *
- * The signal is convention. Hand-written names follow one — BEM, kebab or
- * snake — so they carry a hyphen or an underscore; hashes are bare. The two
+ * The signal is convention. Hand-written names follow one (BEM, kebab or
+ * snake), so they carry a hyphen or an underscore; hashes are bare. The two
  * exceptions are named because they are the two that break that rule:
  * styled-components puts its own hyphens in, and CSS Modules prefixes an
  * underscore to a digit.
@@ -52,7 +52,7 @@ function describe(node: HTMLElement): string {
  * A running total written once could not stay true: it was set at 6500ms while
  * a collapse pass still runs at 7000ms, and it never came down when a restore
  * sweep put something back. So it reported "collapsed by 6500ms", not
- * "collapsed" — and it is the handle used to check this from a page, so it is
+ * "collapsed", and it is the handle used to check this from a page, so it is
  * the last thing that should lie. Counting the marks is always current.
  *
  * The key stays distinct from the per-element data-winnower-collapsed marker.
@@ -70,8 +70,8 @@ function publishCount(): void {
  * Restore anything we collapsed that has since gained real content.
  *
  * Guards evaluated at collapse time are not enough on their own. YouTube's
- * #guide-inner-content is genuinely empty during early passes — 0 children,
- * 0 links, real height, hidden descendants — so it satisfied every check, and
+ * #guide-inner-content is genuinely empty during early passes (0 children,
+ * 0 links, real height, hidden descendants), so it satisfied every check, and
  * by the time it held 635 descendants and 38 links it was already hidden and
  * marked. Re-checking each pass makes the collapse self-healing instead of
  * permanent.
@@ -133,7 +133,7 @@ function isHiddenByWinnower(el: Element): boolean {
 /**
  * Collapse wrappers left holding empty space after their ad child is hidden.
  *
- * Many sites generate their class names (The Verge ships `o1ls9u`, `o1ls91s` —
+ * Many sites generate their class names (The Verge ships `o1ls9u` and `o1ls91s`,
  * CSS-in-JS hashes that change on rebuild), so filter lists have nothing stable
  * to target on the wrapper. Hiding the ad child leaves a parent that still has
  * its own min-height: measured 2066x250, 800x90 and 380x250 holes on
@@ -141,7 +141,7 @@ function isHiddenByWinnower(el: Element): boolean {
  *
  * This function finds the boxes and reads their facts. Whether a box qualifies
  * is src/shared/collapse-match.ts, which build/validate.ts runs against fixed
- * shapes — so the judgement that has twice gone wrong here can be asked about
+ * shapes, so the judgement that has twice gone wrong here can be asked about
  * directly instead of only observed in a browser afterwards.
  *
  * THE FACTS GO IN AS GETTERS, NOT VALUES. collapseVerdict reads them
@@ -149,7 +149,7 @@ function isHiddenByWinnower(el: Element): boolean {
  * never computed for a box a cheap one already rejected. Measured on
  * theverge.com: of 3,088 candidates, 2,236 die on the rect and 750 more on the
  * text, leaving ~24 to reach the getComputedStyle walk. Pass a plain object of
- * computed values instead and all 3,088 pay for all of it — 16ms per pass
+ * computed values instead and all 3,088 pay for all of it: 16ms per pass
  * becomes seconds on a feed page.
  */
 function collapseEmptyWrappers(): PassResult {
@@ -197,8 +197,8 @@ function collapseEmptyWrappers(): PassResult {
     });
 
     if (judged.verdict === 'skip') {
-      // Only the late refusals — 94% of boxes are rejected on size or text, and
-      // a line for each would bury the handful worth reading — and only once
+      // Only the late refusals. 94% of boxes are rejected on size or text, and
+      // a line for each would bury the handful worth reading, and only once
       // per box until the answer changes. Passes repeat every few seconds and
       // refuse the same boxes for the same reasons each time: one theverge.com
       // load wrote ~370 lines, four passes of the same ~90 refusals, which on
@@ -229,8 +229,8 @@ function collapseEmptyWrappers(): PassResult {
  * How long to wait after a change before passing, and how far that backs off.
  *
  * The cost of watching is a callback that sets a flag; the cost of a PASS is
- * ~16ms. So mutations are coalesced — a page mutating every frame still only
- * pays for one pass per window — and the window doubles each time a pass finds
+ * ~16ms. So mutations are coalesced: a page mutating every frame still only
+ * pays for one pass per window, and the window doubles each time a pass finds
  * nothing, to a ceiling. A feed page that never stops changing therefore
  * settles at one pass every QUIET_MAX rather than one per change, while a page
  * that is actively being tidied stays responsive.
@@ -248,7 +248,7 @@ let watcher: MutationObserver | undefined;
  * qualified once and needs a SECOND pass before it may be collapsed, and
  * nothing else guarantees that second pass will ever happen: if the page has
  * gone quiet, no mutation arrives to trigger one. Under the old fixed
- * timetable that was not a rare race but a structural hole — the last
+ * timetable that was not a rare race but a structural hole: the last
  * scheduled pass could only ever CREATE candidates, never act on them, so
  * anything that first qualified at 7000ms stayed a candidate for good.
  * Measured on a cold load of a news site: 15 candidates, 0 collapsed, with
@@ -285,15 +285,15 @@ export function pass(): void {
  * This replaced a fixed timetable of passes at 800/2000/4000/7000ms. The
  * comment justifying that timetable said an observer "would fire constantly on
  * feed-style pages for no benefit, since ad wrappers appear early and then stay
- * put". The second half turned out not to be true — on a cold load ads are
+ * put". The second half turned out not to be true. On a cold load ads are
  * routinely hidden after the last pass had already run, and winnower simply
- * left the gaps — and the first half is answered by coalescing: the observer
+ * left the gaps, and the first half is answered by coalescing: the observer
  * callback does no work beyond queueing, and the backoff bounds the passes.
  *
  * Attribute changes are watched for `class` only. A class change can make an
  * element start matching a filter selector, which is a real signal; inline
  * style changes are the page hiding its own UI, which winnower deliberately no
- * longer treats as evidence of anything — see isHiddenByWinnower.
+ * longer treats as evidence of anything. See isHiddenByWinnower.
  *
  * This runs independently of the domain lookup. It must not be driven by the
  * worker's reply, which returns early when a domain has no specific selectors:

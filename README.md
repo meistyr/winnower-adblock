@@ -32,7 +32,7 @@ Streaming ads that are stitched into the video itself are not blocked.
 
 winnower collects nothing about you and has no server to collect it to. The filter lists ship
 inside the extension. The one thing it asks anyone for is GitHub's latest version number, once a
-day, so it can tell you when a new release is out — no account, no identifier, nothing else.
+day, so it can tell you when a new release is out. No account, no identifier, nothing else.
 
 ## Install
 
@@ -71,12 +71,12 @@ Releases are built by GitHub Actions when a `v*` tag is pushed. See [`CHANGELOG.
 winnower records only errors by default, so anyone reporting a broken site can open
 **Diagnostics** in the menu and press **Copy** without setting anything up first.
 
-Developer mode records everything else too: every rule applied, every box collapsed, and — most
-usefully — every box deliberately left alone, with the reason.
+Developer mode records everything else too: every rule applied, every box collapsed, and, most
+usefully, every box deliberately left alone with the reason.
 
 ```
- 8.1s  collapse  skip  div.channel-page__video-player — nothing of ours hidden inside
-12.6s  collapse  hid   div.duet--homepage-category-shelves-rail-section — 300×1348 emptied wrapper
+ 8.1s  collapse  skip  div.channel-page__video-player: nothing of ours hidden inside
+12.6s  collapse  hid   div.duet--homepage-category-shelves-rail-section: 300×1348 emptied wrapper
 ```
 
 **To turn it on,** open winnower's menu and click the version number in the bottom-right corner

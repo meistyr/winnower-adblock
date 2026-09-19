@@ -15,7 +15,7 @@
  * targets are rendered by page JS well after load, so there is nothing to flash.
  *
  * Procedural filters (#?#, :has-text, :upward) need a runtime evaluator and are
- * skipped — counted and reported so the gap stays visible.
+ * skipped, counted and reported so the gap stays visible.
  */
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { HIDE_DECLARATION } from '../src/shared/constants.ts';
@@ -37,7 +37,7 @@ const CHUNK = 500;
  *
  * 1. A kill switch. Manifest-injected CSS cannot be removed by a content
  *    script, so without a guard like this the per-site allowlist could not
- *    restore a site that cosmetic filtering had broken — which is the main
+ *    restore a site that cosmetic filtering had broken, which is the main
  *    reason to have an allowlist at all. Setting the attribute on <html>
  *    disables every rule at once, instantly.
  *
@@ -136,7 +136,7 @@ async function main() {
     // MERGE rather than assign: both "youtube.com" and "www.youtube.com" appear
     // in upstream lists and collapse to the same key here. Assigning let the
     // second overwrite the first, which silently cost youtube.com 16 of its 19
-    // selectors — including every ad-container rule.
+    // selectors, including every ad-container rule.
     const key = d.replace(/^www\./, '');
     const b = buckets[bucketOf(key)];
     if (b[key]) {
@@ -164,7 +164,7 @@ async function main() {
   // restates intent cannot detect that intent was not carried out.
   //
   // Counted by splitting on the same constant chunkToCss emits, so changing the
-  // declaration cannot leave this silently matching nothing — which is what a
+  // declaration cannot leave this silently matching nothing, which is what a
   // hand-written pattern did the moment the marker was added to it.
   const emittedRules = css.split(HIDE_DECLARATION).length - 1;
   console.log(`  generic selectors     ${genericList.length.toLocaleString().padStart(8)}   ${kb(css.length).padStart(5)} KB  in ${emittedRules} emitted rules`);

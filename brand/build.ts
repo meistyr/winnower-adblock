@@ -1,5 +1,5 @@
 /**
- * winnower brand marks — the single source for every mark file.
+ * winnower brand marks: the single source for every mark file.
  *
  *   npm run brand
  *
@@ -17,11 +17,11 @@
  * The decisions, in the order they were made:
  *   1. The leaf: a leaf with its tip cut off along a straight line.
  *   2. Tilt: the leaf turns until its straight cut runs parallel to the outer
- *      left stroke of the "w" in Geist Mono Medium (79.04°) — a 34.04° tilt.
+ *      left stroke of the "w" in Geist Mono Medium (79.04°), a 34.04° tilt.
  *   3. Lockup height: the icon is centred on the middle of the x-height, so it
  *      reaches the same distance above the letters as below the baseline.
  *   4. Lockup spacing: the gap between the cut and the w equals the gap the
- *      "o" keeps from the second "w" — the letters' own spacing.
+ *      "o" keeps from the second "w", the letters' own spacing.
  *   5. Colour: monochrome marks; the underscore is the popup's "on" green.
  *   6. Reversed weights (judged by eye): a leaf drawn
  *      light on dark looks heavier than the same leaf dark on light

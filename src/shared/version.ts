@@ -9,8 +9,8 @@
  *
  * Deliberately not a semver library. winnower's versions are three numbers, the
  * tags carry a "v" prefix, and the only question asked is "is this bigger".
- * Pre-release suffixes are not used — CONTRIBUTING.md says alpha is expressed
- * by the 0. major — so anything after the numbers is ignored rather than
+ * Pre-release suffixes are not used, CONTRIBUTING.md says alpha is expressed
+ * by the 0. major, so anything after the numbers is ignored rather than
  * ranked, and a tag that parses to nothing is treated as "no news".
  */
 
@@ -27,7 +27,7 @@ export function parseVersion(version: string): [number, number, number] {
 /**
  * True only when `latest` is strictly ahead of `current`.
  *
- * Equal is not newer, and older is not newer — a rolled-back release must not
+ * Equal is not newer, and older is not newer, a rolled-back release must not
  * announce itself as an update. Unparseable input yields 0.0.0, which is never
  * ahead of a real version, so a malformed tag says nothing rather than
  * announcing a downgrade.

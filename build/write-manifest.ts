@@ -58,7 +58,7 @@ const manifest = {
 
   content_scripts: [
     // Cosmetic filtering. The generic stylesheet is injected natively here so
-    // it lands before first paint — no JS, no flash. content.js handles only
+    // it lands before first paint, no JS, no flash. content.js handles only
     // the domain-specific selectors, which it fetches via the service worker.
     // ISOLATED world (the default) is required: it needs chrome.runtime.
     //
@@ -82,7 +82,7 @@ const manifest = {
     })).concat([
       // Its own ruleset so it can be switched off alone. DNR cannot tell a
       // popunder from a deliberate visit to the same domain, so these rules
-      // also block navigating there on purpose — right for popunder farms,
+      // also block navigating there on purpose, right for popunder farms,
       // but the one part of winnower most likely to surprise someone.
       { id: 'popup', enabled: true, path: 'rules/popup.json' },
     ]),
@@ -122,7 +122,7 @@ async function main() {
   }
 
   if (missing.length) {
-    console.error('Missing ruleset files — run `npm run convert` first:');
+    console.error('Missing ruleset files. Run `npm run convert` first:');
     for (const m of missing) console.error(`  ! ${m}`);
     process.exitCode = 1;
     return;
@@ -171,7 +171,7 @@ async function main() {
   // MAIN-world scripts are registered dynamically by the service worker rather
   // than declared above. They run at document_start with no chrome.storage and
   // no synchronous signal available that early, so they cannot check the
-  // allowlist themselves — and declared in the manifest they cannot be switched
+  // allowlist themselves, and declared in the manifest they cannot be switched
   // off at all. That is why the kill switches failed on YouTube: its blocking
   // is entirely these scripts. Registered dynamically, the worker can exclude
   // allowlisted sites and drop them entirely when the master switch is off.
@@ -202,7 +202,7 @@ async function main() {
   const ungrouped = catalogue.filter((c) => !c.group);
   if (ungrouped.length) {
     // The popup renders by group, so an ungrouped list would silently vanish
-    // from the UI while still running — the kind of thing nobody would notice.
+    // from the UI while still running, the kind of thing nobody would notice.
     console.error('Lists with no group (would be invisible in the popup):');
     for (const u of ungrouped) console.error(`  ! ${u.id}`);
     process.exitCode = 1;

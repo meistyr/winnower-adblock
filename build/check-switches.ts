@@ -127,7 +127,7 @@ async function runContentScript(failures: number, reply: Reply) {
   const documentElement = stubEl();
   // Keep what the script builds. The marker that tells the collapser which
   // hiding is winnower's own is assembled at runtime, not baked into the
-  // bundle as a literal, so grepping content.js for it proves nothing — the
+  // bundle as a literal, so grepping content.js for it proves nothing. The
   // only honest check is what the script actually injects.
   const created: ReturnType<typeof stubEl>[] = [];
   const document = {
@@ -146,7 +146,7 @@ async function runContentScript(failures: number, reply: Reply) {
       sendMessage(msg: { type?: string } | undefined, cb: (r: Reply | undefined) => void) {
         // Only the cosmetic question is under test. The content script also
         // posts batches of diagnostic lines, and counting those would make the
-        // retry assertion depend on how much it happened to record — which is
+        // retry assertion depend on how much it happened to record, which is
         // exactly what it started doing the moment logging was added.
         if (msg?.type !== 'winnower:cosmetic') {
           cb(undefined);
@@ -181,7 +181,7 @@ async function runContentScript(failures: number, reply: Reply) {
     () => {},
     // The collapser watches the page for changes rather than running to a fixed
     // timetable. Both this and clearTimeout are free variables in the bundle,
-    // and Node has neither — without them content.js throws a ReferenceError
+    // and Node has neither. Without them content.js throws a ReferenceError
     // before a single check runs, which reads as a broken harness, not a bug.
     class { observe() {} disconnect() {} takeRecords() { return []; } },
     // The content script flushes its diagnostic log on pagehide, so the global
@@ -202,7 +202,7 @@ export async function checkSwitches(): Promise<CheckResult> {
   const problems: string[] = [];
   const note = (ok: boolean, label: string, detail: string) => {
     lines.push(`  ${ok ? 'ok  ' : 'FAIL'}  ${label.padEnd(34)} ${detail}`);
-    if (!ok) problems.push(`kill switch: ${label} — ${detail}`);
+    if (!ok) problems.push(`kill switch: ${label}, ${detail}`);
   };
 
   // --- the worker's decision, per frame ---
@@ -252,7 +252,7 @@ export async function checkSwitches(): Promise<CheckResult> {
   // src/collapse.ts only collapses a box once it finds something WINNOWER hid
   // inside it, and it knows winnower's own hiding by this marker. A domain rule
   // that hid without marking would leave the collapser blind to precisely the
-  // boxes those selectors just emptied, and nothing would error — it would
+  // boxes those selectors just emptied, and nothing would error. It would
   // quietly collapse less. generic.css is asserted separately in validate.ts.
   const injected = await runContentScript(0, { selectors: ['.ad-slot', '.promo'], off: false, dev: false });
   const marked = injected.injectedCss.includes(HIDE_DECLARATION);
