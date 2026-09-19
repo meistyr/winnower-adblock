@@ -8,7 +8,7 @@
  */
 import type { BuildStats, ListGroup } from './shared/catalogue.ts';
 import { RELEASES_PAGE } from './shared/constants.ts';
-import { formatLog, formatTime, type LogLine } from './shared/log.ts';
+import { formatLog, formatTime, groupRepeats, type LogLine } from './shared/log.ts';
 import type { Message, PopupState, Reply } from './shared/messages.ts';
 
 const GROUPS: ReadonlyArray<{ key: ListGroup; label: string; note: string }> = [
@@ -267,9 +267,11 @@ function renderLog() {
   }
 
   // Grouped by site, same as the copied text: a log is read by someone working
-  // out which page each run belongs to.
+  // out which page each run belongs to. Identical lines from one pass are
+  // folded into a count — a grid of twenty cards is twenty real elements and
+  // twenty identical lines, and the count says all of what they said.
   let host: string | undefined;
-  for (const line of logLines) {
+  for (const line of groupRepeats(logLines)) {
     if (line.host !== host) {
       host = line.host;
       const heading = document.createElement('div');
@@ -288,9 +290,13 @@ function renderLog() {
     verb.textContent = line.verb;
     verb.classList.add(line.verb);
     row.querySelector('.log-msg')!.textContent = text;
-    // The column is one line and these run long; the full text on hover beats
-    // wrapping every row and losing the shape of the table.
-    row.title = text;
+    if (line.count > 1) {
+      const times = document.createElement('span');
+      times.className = 'log-count';
+      times.textContent = ` ×${line.count}`;
+      row.querySelector('.log-msg')!.appendChild(times);
+    }
+    row.title = line.count > 1 ? `${text} — ${line.count} times in this pass` : text;
     list.appendChild(row);
   }
 }

@@ -11,7 +11,7 @@ import type { PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
 import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/collapse-match.ts';
-import { formatLine, isAlwaysKept, type LogLine } from '../src/shared/log.ts';
+import { formatLine, groupRepeats, isAlwaysKept, type LogLine } from '../src/shared/log.ts';
 import { isNewer } from '../src/shared/version.ts';
 import { checkSwitches } from './check-switches.ts';
 
@@ -207,6 +207,20 @@ const rendered = formatLine(ERR);
 const hasReason = rendered.includes('— boom') && rendered.includes('collapse') && rendered.includes('1.2s');
 console.log(`  ${hasReason ? 'ok  ' : 'FAIL'}  log: line carries time, layer and reason   ${JSON.stringify(rendered.trim())}`);
 if (!hasReason) problems.push(`a log line renders as ${JSON.stringify(rendered)}, missing its time, layer or reason`);
+
+// A grid of identical cards writes one line per card. Folding them keeps the
+// count without the wall of text — and must NOT fold across passes, or a box
+// refused every pass would read as one event.
+const SAME = { t: 900, layer: 'collapse', verb: 'skip', subject: 'div.card', reason: 'contains a link' } as const;
+const folded = groupRepeats([
+  { ...SAME }, { ...SAME }, { ...SAME },
+  { ...SAME, subject: 'div.other' },
+  { ...SAME, t: 4000 },
+]);
+const foldedRight =
+  folded.length === 3 && folded[0].count === 3 && folded[1].count === 1 && folded[2].count === 1;
+console.log(`  ${foldedRight ? 'ok  ' : 'FAIL'}  log: repeats folded, passes kept apart   ${folded.map((f) => `${f.subject}@${f.t}×${f.count}`).join(' ')}`);
+if (!foldedRight) problems.push('the log folds repeated lines incorrectly');
 // The update check's comparison. Text comparison is the trap here — "0.10.0"
 // sorts BELOW "0.9.0" as a string, so the release that matters is the one that
 // never gets announced.

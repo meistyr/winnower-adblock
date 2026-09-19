@@ -51,6 +51,42 @@ export const LOG_CAP = 500;
 /** Kept even with developer mode off. */
 export const isAlwaysKept = (line: LogLine): boolean => line.verb === 'error';
 
+/** A line, plus how many identical ones it stands for. */
+export interface GroupedLine extends LogLine {
+  count: number;
+}
+
+/**
+ * Fold identical lines from the same pass into one, carrying a count.
+ *
+ * A pass walks the whole page, so a grid of twenty identical cards produces
+ * twenty identical lines — theverge.com wrote `div.up4voo8 — contains visible
+ * media` twenty times in one pass, and twitch.tv's directory did the same for
+ * every stream card. They are genuinely different elements, so they cannot be
+ * deduplicated where they are recorded; but "this happened twenty times" is
+ * the whole of what those twenty lines say.
+ *
+ * Grouped within a pass rather than only when adjacent: the repeats interleave
+ * (card, title, thumbnail, card, title, thumbnail…), so adjacency misses them.
+ * First-occurrence order is kept, which keeps the pass readable top to bottom.
+ */
+export function groupRepeats(lines: readonly LogLine[]): GroupedLine[] {
+  const out: GroupedLine[] = [];
+  const seen = new Map<string, GroupedLine>();
+  for (const line of lines) {
+    const key = `${line.host}|${line.t}|${line.layer}|${line.verb}|${line.subject}|${line.reason ?? ''}`;
+    const existing = seen.get(key);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    const grouped: GroupedLine = { ...line, count: 1 };
+    seen.set(key, grouped);
+    out.push(grouped);
+  }
+  return out;
+}
+
 /** `802ms`, `1.2s` — short enough for a narrow column, precise enough to order by. */
 export function formatTime(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '—';
@@ -64,10 +100,10 @@ export function formatTime(ms: number): string {
  * when, which part, what it did, what it did it to — and the reason after the
  * dash.
  */
-export function formatLine(line: LogLine): string {
+export function formatLine(line: LogLine, count = 1): string {
   const when = formatTime(line.t).padStart(6);
   const what = line.reason ? `${line.subject} — ${line.reason}` : line.subject;
-  return `${when}  ${line.layer.padEnd(8)} ${line.verb.padEnd(8)} ${what}`;
+  return `${when}  ${line.layer.padEnd(8)} ${line.verb.padEnd(8)} ${what}${count > 1 ? `  ×${count}` : ''}`;
 }
 
 /**
@@ -79,12 +115,12 @@ export function formatLine(line: LogLine): string {
 export function formatLog(lines: readonly LogLine[], header?: string): string {
   const out: string[] = header ? [header] : [];
   let host: string | undefined;
-  for (const line of lines) {
+  for (const line of groupRepeats(lines)) {
     if (line.host !== host) {
       host = line.host;
       out.push('', `— ${host || 'winnower'} —`);
     }
-    out.push(formatLine(line));
+    out.push(formatLine(line, line.count));
   }
   if (out.length === (header ? 1 : 0)) out.push('(nothing recorded)');
   return out.join('\n').trim() + '\n';
