@@ -64,6 +64,13 @@ function restoreWronglyCollapsed(): number {
 // before that reply arrives, so they must check it rather than assume.
 let off = false;
 
+/** What one pass did, so the scheduler can decide when the next one is due. */
+interface PassResult {
+  collapsed: number;
+  candidates: number;
+  restored: number;
+}
+
 /**
  * Did WINNOWER hide this element, as opposed to the page hiding its own?
  *
@@ -111,11 +118,12 @@ function isHiddenByWinnower(el: Element): boolean {
  * computed values instead and all 3,088 pay for all of it — 16ms per pass
  * becomes seconds on a feed page.
  */
-function collapseEmptyWrappers(): number {
-  if (off) return 0;
+function collapseEmptyWrappers(): PassResult {
+  if (off) return { collapsed: 0, candidates: 0, restored: 0 };
   let collapsed = 0;
+  let candidates = 0;
 
-  restoreWronglyCollapsed();
+  const restored = restoreWronglyCollapsed();
 
   // Keyed off the signal rather than a selector list. The first attempt walked
   // up from elements matching the domain selectors, which found nothing: the ad
@@ -157,6 +165,7 @@ function collapseEmptyWrappers(): number {
     if (verdict === 'skip') continue;
     if (verdict === 'candidate') {
       node.dataset.winnowerCandidate = '1';
+      candidates += 1;
       continue;
     }
 
@@ -165,31 +174,98 @@ function collapseEmptyWrappers(): number {
     collapsed += 1;
   }
   if (collapsed) publishCount();
-  return collapsed;
+  return { collapsed, candidates, restored };
+}
+
+/**
+ * How long to wait after a change before passing, and how far that backs off.
+ *
+ * The cost of watching is a callback that sets a flag; the cost of a PASS is
+ * ~16ms. So mutations are coalesced — a page mutating every frame still only
+ * pays for one pass per window — and the window doubles each time a pass finds
+ * nothing, to a ceiling. A feed page that never stops changing therefore
+ * settles at one pass every QUIET_MAX rather than one per change, while a page
+ * that is actively being tidied stays responsive.
+ */
+const QUIET_MIN = 400;
+const QUIET_MAX = 8000;
+let quiet = QUIET_MIN;
+let timer: ReturnType<typeof setTimeout> | undefined;
+let watcher: MutationObserver | undefined;
+
+/**
+ * Act on what a pass found, and decide whether another is owed.
+ *
+ * The candidate case is the one that matters. A candidate is a box that
+ * qualified once and needs a SECOND pass before it may be collapsed, and
+ * nothing else guarantees that second pass will ever happen: if the page has
+ * gone quiet, no mutation arrives to trigger one. Under the old fixed
+ * timetable that was not a rare race but a structural hole — the last
+ * scheduled pass could only ever CREATE candidates, never act on them, so
+ * anything that first qualified at 7000ms stayed a candidate for good.
+ * Measured on a cold load of a news site: 15 candidates, 0 collapsed, with
+ * every one of them passing every guard.
+ */
+function settle(r: PassResult): void {
+  if (r.collapsed || r.restored) quiet = QUIET_MIN;
+  else quiet = Math.min(QUIET_MAX, quiet * 2);
+  if (r.candidates) schedule(true);
+}
+
+/** Queue a pass, unless one is already queued. */
+function schedule(soon = false): void {
+  if (off || timer !== undefined) return;
+  timer = setTimeout(() => {
+    timer = undefined;
+    if (off) return;
+    // Idle time if the browser offers it, so a pass never competes with the
+    // page's own work; the timeout stops it being deferred indefinitely on a
+    // page that is never idle.
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => pass(), { timeout: 1000 });
+    else pass();
+  }, soon ? QUIET_MIN : quiet);
 }
 
 /** Run one pass now. Used after the domain rules land, which may have just emptied a wrapper. */
 export function pass(): void {
-  collapseEmptyWrappers();
+  settle(collapseEmptyWrappers());
 }
 
 /**
- * Schedule the staged passes, then the restore-only sweeps.
+ * Watch the page and pass when it changes.
  *
- * Staged re-runs rather than a MutationObserver: the observer would fire
- * constantly on feed-style pages for no benefit, since ad wrappers appear early
- * and then stay put. The later sweeps catch anything that populates after the
- * passes stop — lazy sections, a menu opened for the first time.
+ * This replaced a fixed timetable of passes at 800/2000/4000/7000ms. The
+ * comment justifying that timetable said an observer "would fire constantly on
+ * feed-style pages for no benefit, since ad wrappers appear early and then stay
+ * put". The second half turned out not to be true — on a cold load ads are
+ * routinely hidden after the last pass had already run, and winnower simply
+ * left the gaps — and the first half is answered by coalescing: the observer
+ * callback does no work beyond queueing, and the backoff bounds the passes.
+ *
+ * Attribute changes are watched for `class` only. A class change can make an
+ * element start matching a filter selector, which is a real signal; inline
+ * style changes are the page hiding its own UI, which winnower deliberately no
+ * longer treats as evidence of anything — see isHiddenByWinnower.
  *
  * This runs independently of the domain lookup. It must not be driven by the
  * worker's reply, which returns early when a domain has no specific selectors:
- * the generic stylesheet still hid things on those pages, and theverge.com's
- * leftover slots come from a generic rule, not a domain one.
+ * the generic stylesheet still hid things on those pages, and the leftover
+ * slots that motivated this come from a generic rule, not a domain one.
  */
 export function start(): void {
-  document.addEventListener('DOMContentLoaded', pass, { once: true });
-  for (const ms of [800, 2000, 4000, 7000]) setTimeout(pass, ms);
-  for (const ms of [10000, 15000, 25000]) setTimeout(restoreWronglyCollapsed, ms);
+  document.addEventListener('DOMContentLoaded', () => schedule(true), { once: true });
+
+  if (typeof MutationObserver === 'function') {
+    watcher = new MutationObserver(() => schedule());
+    watcher.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+  }
+
+  schedule(true);
 }
 
 /**
@@ -201,6 +277,14 @@ export function start(): void {
  */
 export function disable(): void {
   off = true;
+  // Stop watching as well as stop collapsing. A live observer on a paused site
+  // would keep queueing passes that do nothing, for as long as the tab is open.
+  watcher?.disconnect();
+  watcher = undefined;
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    timer = undefined;
+  }
   for (const n of document.querySelectorAll<HTMLElement>('[data-winnower-collapsed]')) {
     n.style.removeProperty('display');
     delete n.dataset.winnowerCollapsed;

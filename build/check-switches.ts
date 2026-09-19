@@ -149,7 +149,8 @@ async function runContentScript(failures: number, reply: Reply) {
   };
 
   const run = new Function(
-    'chrome', 'document', 'location', 'getComputedStyle', 'setTimeout', 'console', code,
+    'chrome', 'document', 'location', 'getComputedStyle', 'setTimeout', 'clearTimeout',
+    'MutationObserver', 'console', code,
   ) as (...a: unknown[]) => void;
 
   run(
@@ -161,6 +162,12 @@ async function runContentScript(failures: number, reply: Reply) {
     // failing a check, which would read as a broken harness and not a bug.
     () => ({ display: 'block', getPropertyValue: () => '' }),
     (fn: () => void) => { fn(); return 0; },
+    () => {},
+    // The collapser watches the page for changes rather than running to a fixed
+    // timetable. Both this and clearTimeout are free variables in the bundle,
+    // and Node has neither — without them content.js throws a ReferenceError
+    // before a single check runs, which reads as a broken harness, not a bug.
+    class { observe() {} disconnect() {} takeRecords() { return []; } },
     { log: () => {}, error: () => {} },
   );
 

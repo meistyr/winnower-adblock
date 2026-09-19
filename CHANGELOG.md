@@ -15,6 +15,10 @@ All notable changes to winnower are documented here. The format follows
   while the stream carried on playing with no picture. It now only tidies up after itself, which
   also fixes the same mistake on any other site that keeps its video player outside the part of
   the page it appears in.
+- **Gaps left where ads were:** winnower now watches a page for as long as you have it open,
+  instead of stopping seven seconds after it loads. Ads that arrive late — on a slow connection,
+  or further down a page as you scroll — had their space left behind as an empty gap, because
+  winnower had stopped looking by the time they appeared.
 
 ## [0.2.1] - 2026-09-18
 
