@@ -127,11 +127,11 @@ function flushLog(): void {
  * The host is taken from the sender, never from the message: winnower listens
  * on every site, so a page can send whatever it likes.
  */
-async function record(lines: LogLine[], host?: string): Promise<void> {
+async function record(lines: LogLine[], host?: string, always = false): Promise<void> {
   if (!lines.length) return;
   await loadLog();
   const { dev } = await getSettings();
-  const keep = lines.filter((line) => dev || isAlwaysKept(line));
+  const keep = lines.filter((line) => always || dev || isAlwaysKept(line));
   if (!keep.length) return;
   for (const line of keep) logLines.push(host ? { ...line, host } : line);
   if (logLines.length > LOG_CAP) logLines = logLines.slice(-LOG_CAP);
@@ -140,9 +140,9 @@ async function record(lines: LogLine[], host?: string): Promise<void> {
 
 const workerStart = Date.now();
 
-/** Record one line about the worker's own behaviour. */
-const note = (verb: LogLine['verb'], subject: string, reason?: string) =>
-  void record([{ t: Date.now() - workerStart, layer: 'worker', verb, subject, reason }]).catch(() => {});
+/** Record one line about the worker's own behaviour. `always` keeps it whatever the level. */
+const note = (verb: LogLine['verb'], subject: string, always = false) =>
+  record([{ t: Date.now() - workerStart, layer: 'worker', verb, subject }], undefined, always).catch(() => {});
 
 async function isAllowlisted(hostname: string): Promise<boolean> {
   const { allowlist, master } = await getSettings();
@@ -511,14 +511,18 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
     const reply = replyFor(msg.type, sendResponse);
     (async () => {
       const { dev } = await getSettings();
-      // Order matters. record() drops anything that is not an error while
-      // developer mode is off, so writing the setting first means the line
-      // saying recording STOPPED is the first casualty of it stopping — and a
-      // log with an unexplained gap in it is worse than no log. Noted while it
-      // is still on, on the way out; on the way in, once it is on.
-      if (dev) note('applied', 'developer mode off');
       await chrome.storage.local.set({ dev: !dev });
-      if (!dev) note('applied', 'developer mode on');
+      // Kept whichever way it went. record() drops anything that is not an
+      // error while developer mode is off, which would make the line saying
+      // recording STOPPED the first casualty of it stopping — leaving a log
+      // that simply ends, with nothing to say winnower had not died.
+      //
+      // Forced rather than ordered. The first attempt at this wrote the line
+      // before flipping the setting, which reads correctly and loses: note()
+      // is async and awaits storage before deciding what to keep, so the flip
+      // two lines below got there first and the line was dropped anyway. A
+      // line is kept for what it is, not for when it happened to run.
+      await note('applied', `developer mode ${dev ? 'off' : 'on'}`, true);
       reply({ dev: !dev });
     })().catch(() => reply(null));
     return true;
