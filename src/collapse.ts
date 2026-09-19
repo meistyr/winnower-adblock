@@ -14,12 +14,36 @@ import { collapseVerdict } from './shared/collapse-match.ts';
 import { HID_MARKER } from './shared/constants.ts';
 import { report } from './report.ts';
 
+/**
+ * Is this class name one a person chose, rather than one a build tool made up?
+ *
+ * Generated names say nothing about what an element is, and there are always
+ * more of them. styled-components ships `Layout-sc-1xcs6mc-0` and `imqbpe`,
+ * CSS Modules ship `_1p001ee0`, CSS-in-JS builds ship `o1ls9u` and `up4voo8`.
+ * Naming a box by its first two classes picked those every time: twitch.tv's
+ * player slot was logged as `div.Layout-sc-1xcs6mc-0.imqbpe`, when the class
+ * worth reading was `channel-page__video-player`.
+ *
+ * The signal is convention. Hand-written names follow one — BEM, kebab or
+ * snake — so they carry a hyphen or an underscore; hashes are bare. The two
+ * exceptions are named because they are the two that break that rule:
+ * styled-components puts its own hyphens in, and CSS Modules prefixes an
+ * underscore to a digit.
+ */
+const isMeaningfulClass = (c: string) =>
+  /[-_]/.test(c) && !c.includes('-sc-') && !/^_\d/.test(c);
+
 /** A short label for a box, for the diagnostic log. */
 function describe(node: HTMLElement): string {
-  const classes = typeof node.className === 'string' && node.className
-    ? '.' + node.className.trim().split(/\s+/).slice(0, 2).join('.')
-    : '';
-  return node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') + classes;
+  const all = typeof node.className === 'string' && node.className
+    ? node.className.trim().split(/\s+/).filter(Boolean)
+    : [];
+  // Generated names are still used when there is nothing better: a hash tells
+  // two boxes apart, which is more than a bare `div` does.
+  const meaningful = all.filter(isMeaningfulClass);
+  const chosen = (meaningful.length ? meaningful : all).slice(0, 2);
+  return node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') +
+    (chosen.length ? '.' + chosen.join('.') : '');
 }
 
 /**
@@ -173,9 +197,17 @@ function collapseEmptyWrappers(): PassResult {
     });
 
     if (judged.verdict === 'skip') {
-      // Only the late refusals. 94% of boxes are rejected on size or text, and
-      // a line for each would bury the handful worth reading.
-      if (judged.noteworthy) report('collapse', 'skip', describe(node), judged.reason);
+      // Only the late refusals — 94% of boxes are rejected on size or text, and
+      // a line for each would bury the handful worth reading — and only once
+      // per box until the answer changes. Passes repeat every few seconds and
+      // refuse the same boxes for the same reasons each time: one theverge.com
+      // load wrote ~370 lines, four passes of the same ~90 refusals, which on
+      // its own nearly filled a 500-line buffer meant to hold several sites.
+      // A verdict that has not changed is not news.
+      if (judged.noteworthy && node.dataset.winnowerLogged !== judged.reason) {
+        node.dataset.winnowerLogged = judged.reason;
+        report('collapse', 'skip', describe(node), judged.reason);
+      }
       continue;
     }
     if (judged.verdict === 'candidate') {

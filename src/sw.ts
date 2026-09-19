@@ -511,10 +511,14 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
     const reply = replyFor(msg.type, sendResponse);
     (async () => {
       const { dev } = await getSettings();
+      // Order matters. record() drops anything that is not an error while
+      // developer mode is off, so writing the setting first means the line
+      // saying recording STOPPED is the first casualty of it stopping — and a
+      // log with an unexplained gap in it is worse than no log. Noted while it
+      // is still on, on the way out; on the way in, once it is on.
+      if (dev) note('applied', 'developer mode off');
       await chrome.storage.local.set({ dev: !dev });
-      // Recorded before the reply so the first line in a fresh log says when
-      // recording started, which is the question you ask of a log's first line.
-      note('applied', `developer mode ${dev ? 'off' : 'on'}`);
+      if (!dev) note('applied', 'developer mode on');
       reply({ dev: !dev });
     })().catch(() => reply(null));
     return true;
