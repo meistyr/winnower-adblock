@@ -285,7 +285,7 @@ interface UpdateCheck {
  * again tomorrow. A failed attempt still moves checkedAt, so a machine with no
  * connection makes one attempt a day rather than one per worker wake.
  */
-async function checkUpdate(): Promise<{ latest: string; newer: boolean }> {
+async function checkUpdate(force = false): Promise<{ latest: string; newer: boolean }> {
   const current = chrome.runtime.getManifest().version;
   let state: UpdateCheck = { checkedAt: 0, latest: '' };
   try {
@@ -297,7 +297,7 @@ async function checkUpdate(): Promise<{ latest: string; newer: boolean }> {
     /* unreadable settings — treat as never checked */
   }
 
-  if (Date.now() - (state.checkedAt || 0) > UPDATE_CHECK_INTERVAL_MS) {
+  if (force || Date.now() - (state.checkedAt || 0) > UPDATE_CHECK_INTERVAL_MS) {
     try {
       const res = await fetch(RELEASES_API, { headers: { accept: 'application/vnd.github+json' } });
       const json = (await res.json()) as { tag_name?: string };
@@ -566,7 +566,14 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
   return false;
 });
 
-chrome.runtime.onInstalled.addListener(() => { syncAll().catch(() => {}); });
+// Ignoring the day's interval on purpose. A copy that has just been installed
+// or reloaded should find out where it stands straight away: someone who
+// downloads a months-old zip today would otherwise be told it is current, and
+// only learn the truth tomorrow.
+chrome.runtime.onInstalled.addListener(() => {
+  syncAll().catch(() => {});
+  void checkUpdate(true).catch(() => {});
+});
 chrome.runtime.onStartup.addListener(() => { syncAll().catch(() => {}); });
 
 // At module scope rather than behind onStartup/onInstalled, so it runs whenever
