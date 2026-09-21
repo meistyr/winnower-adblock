@@ -7,7 +7,7 @@
  * prints no errors is not evidence. This asserts positive facts instead.
  */
 import { readFile, readdir } from 'node:fs/promises';
-import type { PopupPatterns } from '../src/shared/catalogue.ts';
+import type { ListScriptlet, PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
 import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/collapse-match.ts';
@@ -238,6 +238,76 @@ for (const [latest, current, want] of VERSIONS) {
   const label = `${latest || '(empty)'} over ${current}`;
   console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  update: ${label.padEnd(28)} ${got ? 'newer' : 'no news'}`);
   if (got !== want) problems.push(`the update check says ${latest} over ${current} is ${got}, expected ${want}`);
+}
+console.log('');
+
+// The filter lists' scriptlets (build/convert-scriptlets.ts). A file that does
+// not parse fails in the page with nothing logged, so parse every one here.
+// Then run one for real: the ubo-aopr file for ubo-filters, against a stub
+// page, on a host from its own table. abort-on-property-read makes reading the
+// named property throw, which is easy to observe from outside. Both directions
+// are asserted, and the exception and negation paths are driven through the
+// same generated code by swapping its tables, since the lists may not happen
+// to contain a case that exercises them.
+const listScriptlets = JSON.parse(await readFile(new URL('scriptlets/lists/index.json', EXT_DIR), 'utf8')) as ListScriptlet[];
+let listHosts = 0;
+for (const s of listScriptlets) {
+  listHosts += s.hosts.length;
+  try {
+    new Function(await readFile(new URL(s.file, EXT_DIR), 'utf8'));
+  } catch (e) {
+    problems.push(`${s.file} does not parse: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+console.log(`  list scriptlets     ${listScriptlets.length} files, ${listHosts.toLocaleString()} host entries`);
+
+const aopr = listScriptlets.find((s) => s.list === 'ubo-filters' && s.name === 'ubo-aopr');
+if (!aopr) {
+  problems.push('no ubo-aopr file for ubo-filters, so the list scriptlets cannot be checked running');
+} else {
+  const code = await readFile(new URL(aopr.file, EXT_DIR), 'utf8');
+  const table = (name: string) => JSON.parse(new RegExp(`const ${name} = (.*);\\n`).exec(code)?.[1] ?? 'null') as unknown;
+  const R = table('R') as Array<[string[], string[]?]>;
+  const H = table('H') as Record<string, number[]>;
+  const X = table('X') as Record<string, string[]>;
+  // A rule trapping a plain global, with no negated hosts of its own, on a host
+  // with no exception anywhere up its chain. An exception the lists add later
+  // for that host would otherwise fail this check with nothing wrong.
+  const parents = (h: string) => h.split('.').map((_, i, parts) => parts.slice(i).join('.'));
+  const host = Object.keys(H).find((h) => {
+    const [args, not] = R[H[h][0]];
+    return !not && /^[A-Za-z_$][\w$]*$/.test(args[0]) && !parents(`www.${h}`).some((p) => p in X);
+  });
+  if (!host) {
+    problems.push(`no host in ${aopr.file} traps a plain global, so the list scriptlets cannot be checked running`);
+  } else {
+    const index = H[host][0];
+    const prop = R[index][0][0];
+    const trapped = (hostname: string, src = code) => {
+      const win: Record<string, unknown> = {};
+      new Function('window', 'location', src)(win, { hostname });
+      try {
+        void win[prop];
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    const withTable = (name: string, value: unknown) => code.replace(new RegExp(`const ${name} = .*;\\n`), `const ${name} = ${JSON.stringify(value)};\n`);
+    const negated = R.map((r, i): [string[], string[]?] => (i === index ? [r[0], [`www.${host}`]] : r));
+    const CASES: [string, boolean, boolean][] = [
+      [`${host}, from its table`, trapped(host), true],
+      [`www.${host}, a subdomain`, trapped(`www.${host}`), true],
+      ['example.org, not in the table', trapped('example.org'), false],
+      [`${host} with an exception`, trapped(host, withTable('X', { [host]: ['*'] })), false],
+      [`www.${host} when negated`, trapped(`www.${host}`, withTable('R', negated)), false],
+      [`${host} when a subdomain is negated`, trapped(host, withTable('R', negated)), true],
+    ];
+    for (const [label, got, want] of CASES) {
+      console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  aopr ${prop}: ${label.padEnd(44)} ${got ? 'trapped' : 'open'}`);
+      if (got !== want) problems.push(`the ubo-aopr list scriptlet is ${got ? 'trapped' : 'open'} on ${label}, expected ${want ? 'trapped' : 'open'}`);
+    }
+  }
 }
 console.log('');
 

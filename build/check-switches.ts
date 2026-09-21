@@ -32,8 +32,20 @@ type Listener = (msg: unknown, sender: unknown, respond: (r: Reply) => void) => 
 
 const noopEvent = { addListener: () => {} };
 
+type Registered = { id: string; excludeMatches?: string[] };
+
+/**
+ * What the stubbed worker has switched on and registered. Passed in when a
+ * check needs to watch registration; otherwise every ruleset reads as off and
+ * registration goes nowhere, as before.
+ */
+interface ScriptingProbe {
+  enabled: Set<string>;
+  registered: Registered[];
+}
+
 /** Load extension/sw.js with a stubbed chrome and hand back its message listener. */
-async function loadWorker(allowlist: string[], failStorage = false): Promise<Listener> {
+async function loadWorker(allowlist: string[], failStorage = false, probe?: ScriptingProbe): Promise<Listener> {
   const code = await readFile(new URL('sw.js', EXT_DIR), 'utf8');
   let listener: Listener | null = null;
 
@@ -64,13 +76,26 @@ async function loadWorker(allowlist: string[], failStorage = false): Promise<Lis
     declarativeNetRequest: {
       getDynamicRules: async () => [],
       updateDynamicRules: async () => {},
-      getEnabledRulesets: async () => [],
+      getEnabledRulesets: async () => [...(probe?.enabled ?? [])],
+      updateEnabledRulesets: async ({ enableRulesetIds = [], disableRulesetIds = [] }: { enableRulesetIds?: string[]; disableRulesetIds?: string[] }) => {
+        for (const id of enableRulesetIds) probe?.enabled.add(id);
+        for (const id of disableRulesetIds) probe?.enabled.delete(id);
+      },
       onRuleMatchedDebug: noopEvent,
     },
     scripting: {
-      getRegisteredContentScripts: async () => [],
-      unregisterContentScripts: async () => {},
-      registerContentScripts: async () => {},
+      getRegisteredContentScripts: async () => (probe?.registered ?? []).map((s) => ({ id: s.id })),
+      unregisterContentScripts: async ({ ids }: { ids: string[] }) => {
+        if (probe) probe.registered = probe.registered.filter((s) => !ids.includes(s.id));
+      },
+      // Chrome refuses an id that is already registered, and so does this, or
+      // two syncs overlapping would pass here and fail in the browser.
+      registerContentScripts: async (scripts: Registered[]) => {
+        if (!probe) return;
+        const taken = scripts.find((s) => probe.registered.some((r) => r.id === s.id));
+        if (taken) throw new Error(`Duplicate script ID '${taken.id}'`);
+        probe.registered.push(...scripts);
+      },
     },
     tabs: { onRemoved: noopEvent },
     action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {}, setIcon: async () => {} },
@@ -78,9 +103,15 @@ async function loadWorker(allowlist: string[], failStorage = false): Promise<Lis
     webNavigation: undefined,
   };
 
-  const fetchStub = async (p: string) => ({
-    json: async () => JSON.parse(await readFile(p, 'utf8')) as unknown,
-  });
+  // One read per file, shared. Reading from disk on every call spaced
+  // overlapping syncs apart by the I/O alone, so a race that happens in the
+  // browser, where this fetch is fast, never happened here.
+  const reads = new Map<string, Promise<string>>();
+  const fetchStub = async (p: string) => {
+    if (!reads.has(p)) reads.set(p, readFile(p, 'utf8'));
+    const text = await reads.get(p)!;
+    return { json: async () => JSON.parse(text) as unknown };
+  };
 
   const run = new Function('chrome', 'fetch', 'console', code) as
     (c: unknown, f: unknown, l: unknown) => void;
@@ -257,6 +288,41 @@ export async function checkSwitches(): Promise<CheckResult> {
   const injected = await runContentScript(0, { selectors: ['.ad-slot', '.promo'], off: false, dev: false });
   const marked = injected.injectedCss.includes(HIDE_DECLARATION);
   note(marked, 'domain rules carry the hide marker', marked ? HIDE_DECLARATION : `injected ${JSON.stringify(injected.injectedCss.slice(-40))}`);
+
+  // --- the lists' scriptlets follow their list's switch ---
+  // Fanboy's Annoyance is off by default and holds thousands of set-cookie
+  // rules. Its scriptlets must register when it is switched on and go when it
+  // is switched off again, while the lists left on keep theirs throughout.
+  // Toggled through the same message winnower's menu sends.
+  const probe: ScriptingProbe = { enabled: new Set(['ubo-filters']), registered: [] };
+  const toggler = await loadWorker(['amazon.com'], false, probe);
+  const toggle = (ids: string[]) =>
+    new Promise<void>((resolve) => toggler({ type: 'winnower:toggleGroup', ids }, {}, () => resolve()));
+  const registeredFrom = (list: string) => probe.registered.filter((s) => s.id.startsWith(`winnower-lists-${list}-`)).length;
+
+  await toggle(['fanboy-annoyance']);
+  const whenOn = registeredFrom('fanboy-annoyance');
+  note(whenOn > 0, 'a list switched on registers', `fanboy-annoyance: ${whenOn} scripts`);
+
+  await toggle(['fanboy-annoyance']);
+  const whenOff = registeredFrom('fanboy-annoyance');
+  const kept = registeredFrom('ubo-filters');
+  note(whenOff === 0 && kept > 0, 'a list switched off unregisters', `fanboy-annoyance: ${whenOff}, ubo-filters kept: ${kept}`);
+
+  const listScript = probe.registered.find((s) => s.id.startsWith('winnower-lists-'));
+  const paused = listScript?.excludeMatches?.includes('*://*.amazon.com/*') ?? false;
+  note(paused, 'list scriptlets skip paused sites', paused ? 'amazon.com excluded' : 'amazon.com not excluded');
+
+  // Two switches flipped before the first sync finishes. Each sync unregisters
+  // and registers again, so overlapping runs re-register ids the other has
+  // already put back. Both lists must end up registered, with no error.
+  const replies: unknown[] = [];
+  const toggleReply = (ids: string[]) =>
+    new Promise<void>((resolve) => toggler({ type: 'winnower:toggleGroup', ids }, {}, (r) => { replies.push(r); resolve(); }));
+  await Promise.all([toggleReply(['fanboy-annoyance']), toggleReply(['easylist-cookie'])]);
+  const bothOn = registeredFrom('fanboy-annoyance') > 0 && probe.enabled.has('easylist-cookie');
+  const errored = replies.some((r) => typeof r === 'object' && r !== null && 'error' in r);
+  note(bothOn && !errored, 'two switches at once both apply', errored ? `error: ${JSON.stringify(replies)}` : `fanboy-annoyance: ${registeredFrom('fanboy-annoyance')} scripts`);
 
   return { lines, problems };
 }

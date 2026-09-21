@@ -23,6 +23,7 @@
 | Ads, banners and trackers | About 130,000 network rules from ten community filter lists |
 | YouTube ads | Blocks ads on YouTube, including pre-roll and mid-roll |
 | Prime Video ads | Blocks ad breaks in films and shows on primevideo.com |
+| Site fixes | Runs the fixes the filter lists carry for individual sites, on about 3,500 sites |
 | Leftover ad boxes | Hides ad containers on the page and collapses the gaps they leave |
 | Popups and popunders | Blocks popups and popunders from known ad networks |
 

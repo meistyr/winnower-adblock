@@ -11,6 +11,9 @@ All notable changes to winnower are documented here. The format follows
 - **Prime Video ad blocking:** blocks ads before and during films and shows on primevideo.com.
   The row under **On this page** in winnower's menu now names the site it has rules for, YouTube
   or Prime Video, and reads **Site scripts** everywhere else.
+- **Site fixes from the filter lists:** winnower now runs the scripts the filter lists include for
+  individual sites, which it skipped until now. From the lists that are on by default, that is
+  about 2,500 rules across 3,500 sites. Each list's fixes follow its switch in winnower's menu.
 
 ## [0.3.0] - 2026-09-19
 

@@ -199,9 +199,26 @@ async function syncAllowRules() {
  * network and cosmetic layers turned off correctly while ad payloads went on
  * being pruned.
  *
- * Allowlisted sites become excludeMatches; master off registers nothing.
+ * Allowlisted sites become excludeMatches; master off registers nothing. The
+ * filter lists' scriptlets carry the lists they came from, and register only
+ * while those lists are switched on. Fanboy's Annoyance is off by default and
+ * holds thousands of set-cookie rules, which must not run for someone who
+ * never turned it on.
+ *
+ * One at a time. A sync reads what is registered, unregisters it and
+ * registers again, so two overlapping runs each re-register ids the other has
+ * already put back, and Chrome refuses the duplicate. Every list switch in the
+ * menu runs one, so two switches flipped quickly were enough to leave the
+ * popup guard unregistered.
  */
-async function syncContentScripts() {
+let syncing: Promise<void> = Promise.resolve();
+function syncContentScripts(): Promise<void> {
+  const run = syncing.then(syncContentScriptsNow, syncContentScriptsNow);
+  syncing = run.catch(() => {});
+  return run;
+}
+
+async function syncContentScriptsNow() {
   const { allowlist, master } = await getSettings();
 
   let wanted: DynamicScript[] = [];
@@ -217,13 +234,33 @@ async function syncContentScripts() {
 
   if (!master) return;
 
+  const enabled = new Set(await chrome.declarativeNetRequest.getEnabledRulesets());
   const excludeMatches = allowlist.flatMap((d) => [`*://${d}/*`, `*://*.${d}/*`]);
-  const scripts = wanted.map((s): chrome.scripting.RegisteredContentScript => ({
-    ...s,
-    persistAcrossSessions: true,
-    ...(excludeMatches.length ? { excludeMatches } : {}),
-  }));
-  if (scripts.length) await chrome.scripting.registerContentScripts(scripts);
+  const toRegister = (list: DynamicScript[]) =>
+    list.map(({ rulesets, ...s }): chrome.scripting.RegisteredContentScript => ({
+      ...s,
+      persistAcrossSessions: true,
+      ...(excludeMatches.length ? { excludeMatches } : {}),
+    }));
+  const own = toRegister(wanted.filter((s) => !s.rulesets));
+  const fromLists = toRegister(wanted.filter((s) => s.rulesets?.every((id) => enabled.has(id))));
+
+  if (own.length) await chrome.scripting.registerContentScripts(own);
+
+  // A separate call, because registration is all or nothing. Thousands of
+  // match patterns taken from upstream lists are the likeliest thing here to
+  // be refused, and a refusal must not take the hand-made groups and the popup
+  // guard down with it. Recorded as an error, so it is kept with developer
+  // mode off: otherwise the lists' fixes would stop with no trace at all.
+  if (fromLists.length) {
+    try {
+      await chrome.scripting.registerContentScripts(fromLists);
+    } catch (e) {
+      record(
+        [{ t: Date.now() - workerStart, layer: 'worker', verb: 'error', subject: 'list scriptlets', reason: `not registered: ${e instanceof Error ? e.message : String(e)}` }],
+      ).catch(() => {});
+    }
+  }
 }
 
 /** Everything the switches control, kept in one place so none can be skipped. */
@@ -566,6 +603,8 @@ chrome.runtime.onMessage.addListener((msg: Message | undefined, sender, sendResp
       await chrome.declarativeNetRequest.updateEnabledRulesets(
         anyOn ? { disableRulesetIds: ids } : { enableRulesetIds: ids },
       );
+      // The lists' scriptlets follow the same switch as their network rules.
+      await syncContentScripts();
       reply({ enabled: !anyOn });
     })().catch((e: unknown) => reply({ error: String(e) }));
     return true;

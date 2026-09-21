@@ -22,6 +22,22 @@ export interface DynamicScript {
   runAt: 'document_start' | 'document_end' | 'document_idle';
   world: 'MAIN' | 'ISOLATED';
   allFrames: boolean;
+  /**
+   * Filter lists the script belongs to. Registered only while all of them are
+   * enabled, so a list's scriptlets follow its switch. Not a Chrome field: the
+   * worker removes it before registering.
+   */
+  rulesets?: string[];
+}
+
+/** One entry of scriptlets/lists/index.json (build/convert-scriptlets.ts → build/write-manifest.ts). */
+export interface ListScriptlet {
+  list: string;
+  /** The library's scriptlet name, e.g. ubo-aopr. */
+  name: string;
+  /** Relative to extension/. */
+  file: string;
+  hosts: string[];
 }
 
 /** Per-list conversion stats, as recorded in rules/_stats.json. */
