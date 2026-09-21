@@ -31,6 +31,7 @@ import { convertUboToAdg } from '@adguard/scriptlets/converters';
 import { isValidScriptletRule } from '@adguard/scriptlets/validators';
 import { LISTS } from './lists.config.ts';
 import { SCRIPTLET_GROUPS } from './scriptlet-rules.ts';
+import { exceptionTable, type ScriptletException } from './scriptlet-exceptions.ts';
 import type { ListScriptlet } from '../src/shared/catalogue.ts';
 
 const LISTS_DIR = new URL('../lists/', import.meta.url);
@@ -170,17 +171,8 @@ const RUNTIME = `
 
 async function main() {
   const groups = new Map<string, Group>();
-  /**
-   * host -> exceptions found for it, each `${name}\t${JSON args}` or `*` for
-   * every scriptlet, with the list it came from.
-   *
-   * An exception belongs to its list, and should count only while that list is
-   * on. The files cannot know which lists are on, so an exception is written
-   * into its own list's files, whose running already means its list is on, and
-   * into other lists' files only when its list is on by default. Otherwise an
-   * exception in a list nobody switched on would turn off another list's rules.
-   */
-  const exceptions = new Map<string, Array<{ list: string; key: string }>>();
+  /** host -> the exceptions found for it. Which files they reach is exceptionTable's call. */
+  const exceptions = new Map<string, ScriptletException[]>();
   const onByDefault = new Set(LISTS.filter((l) => l.enabled).map((l) => l.name));
   const counts = { on: emptyCounts(), off: emptyCounts() };
 
@@ -239,10 +231,9 @@ async function main() {
         }
 
         if (isException) {
-          const key = name === undefined ? '*' : `${name}\t${JSON.stringify(args)}`;
           for (const h of include) {
             if (!exceptions.has(h)) exceptions.set(h, []);
-            exceptions.get(h)!.push({ list: list.name, key });
+            exceptions.get(h)!.push({ list: list.name, name, args });
           }
           continue;
         }
@@ -294,15 +285,7 @@ async function main() {
 
     const hosts = [...g.hosts.keys()].sort();
     const H = Object.fromEntries(hosts.map((h) => [h, [...g.hosts.get(h)!]]));
-    const X: Record<string, string[]> = {};
-    for (const [h, found] of exceptions) {
-      const mine = found
-        .filter((x) => x.list === g.list || onByDefault.has(x.list))
-        .map((x) => x.key)
-        .filter((k) => k === '*' || k.startsWith(`${g.name}\t`))
-        .map((k) => (k === '*' ? k : k.slice(g.name.length + 1)));
-      if (mine.length) X[h] = [...new Set(mine)];
-    }
+    const X = exceptionTable(g, exceptions, onByDefault);
 
     const body = [
       `/* winnower, generated. Do not edit.`,

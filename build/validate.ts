@@ -15,6 +15,7 @@ import { formatLine, groupRepeats, isAlwaysKept, type LogLine } from '../src/sha
 import { isNewer } from '../src/shared/version.ts';
 import { checkSwitches } from './check-switches.ts';
 import { crossListCancels, filterKey } from './badfilter.ts';
+import { exceptionTable, type ScriptletException } from './scriptlet-exceptions.ts';
 import { LISTS } from './lists.config.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
@@ -361,6 +362,32 @@ if (!aopr) {
       if (got !== want) problems.push(`the ubo-aopr list scriptlet is ${got ? 'trapped' : 'open'} on ${label}, expected ${want ? 'trapped' : 'open'}`);
     }
   }
+}
+console.log('');
+
+// Scriptlet exceptions (build/scriptlet-exceptions.ts), put to the function the
+// build calls. The lists spell one scriptlet several ways, and an exception
+// written with one alias must still reach rules written with another, as it
+// does in uBlock. The lists hold no such pair today, so the cases are made up.
+const EXCEPTIONS = new Map<string, ScriptletException[]>([
+  ['alias.test', [{ list: 'ubo-filters', name: 'ubo-abort-on-property-read', args: ['x'] }]],
+  ['other.test', [{ list: 'ubo-filters', name: 'ubo-set-constant', args: ['x'] }]],
+  ['offlist.test', [{ list: 'fanboy-annoyance', name: 'ubo-aopr', args: ['x'] }]],
+  ['all.test', [{ list: 'ubo-filters', args: [] }]],
+]);
+const ON_BY_DEFAULT = new Set(['ubo-filters']);
+const aoprTable = exceptionTable({ list: 'ubo-filters', name: 'ubo-aopr' }, EXCEPTIONS, ON_BY_DEFAULT);
+const offListTable = exceptionTable({ list: 'fanboy-annoyance', name: 'ubo-aopr' }, EXCEPTIONS, ON_BY_DEFAULT);
+const EXCEPTION_CASES: [string, boolean][] = [
+  ['abort-on-property-read reaches aopr rules', aoprTable['alias.test']?.includes('["x"]') ?? false],
+  ['set-constant does not reach aopr rules', !('other.test' in aoprTable)],
+  ['an off list stays out of other lists', !('offlist.test' in aoprTable)],
+  ['an off list reaches its own files', offListTable['offlist.test']?.includes('["x"]') ?? false],
+  ['#@#+js() covers every scriptlet', aoprTable['all.test']?.includes('*') ?? false],
+];
+for (const [label, ok] of EXCEPTION_CASES) {
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  exceptions: ${label}`);
+  if (!ok) problems.push(`scriptlet exceptions: ${label}`);
 }
 console.log('');
 
