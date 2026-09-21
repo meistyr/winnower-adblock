@@ -3,9 +3,9 @@
  *
  * Names and argument shapes are AdGuard's (@adguard/scriptlets, GPL-3.0). A
  * maintained library is used rather than hand-written page scripts because
- * YouTube's player changes often, and the library keeps up with those changes.
+ * video players change often, and the library keeps up with those changes.
  *
- * When ads come back after a YouTube update: update @adguard/scriptlets, run
+ * When ads come back after a site update: update @adguard/scriptlets, run
  * `npm run update`, and check these rules against the current player responses.
  *
  * Testing: a tab that has never had a click or key press cannot autoplay, and a
@@ -108,6 +108,25 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
           'propsToMatch',
           '/youtubei/v1/player',
         ],
+      },
+    ],
+  },
+  {
+    id: 'primevideo',
+    matches: ['*://*.primevideo.com/*'],
+    rules: [
+      // GetVodPlaybackResources returns the title as a playlist,
+      // intraTitlePlaylist, of chapters (type "Main") and ad breaks (type
+      // "Remote"). A Remote item carries no video, only the URLs its ads are
+      // fetched from, and each Main item starts where the last one ended, so the
+      // film is whole without them.
+      //
+      // Recursive descent rather than the full path, so the rule still finds the
+      // playlist if it moves within the response. If nothing matches, the
+      // response is left as it was.
+      {
+        name: 'json-prune-fetch-response',
+        args: ['$..intraTitlePlaylist[?(@.type=="Remote")]', '', 'GetVodPlaybackResources'],
       },
     ],
   },

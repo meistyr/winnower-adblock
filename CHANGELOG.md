@@ -6,6 +6,12 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Prime Video ad blocking:** blocks ads before and during films and shows on primevideo.com.
+  The row under **On this page** in winnower's menu now names the site it has rules for, YouTube
+  or Prime Video, and reads **Site scripts** everywhere else.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added

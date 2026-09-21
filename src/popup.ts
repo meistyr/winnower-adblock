@@ -37,9 +37,19 @@ interface PageDiagnostics {
   cosmetic: number | null;
   collapsed: number | null;
   off: boolean;
-  scriptlets: number | null;
+  /** Rules loaded per scriptlet bundle, by group id; null where it did not load. */
+  scriptlets: Record<string, number | null>;
   popupGuard: { hosts: number; blocked: number } | null;
 }
+
+/**
+ * Sites with a scriptlet bundle, for the "On this page" row. Mirrors the ids and
+ * matches of SCRIPTLET_GROUPS in build/scriptlet-rules.ts.
+ */
+const SCRIPTLET_SITES = [
+  { id: 'youtube', label: 'YouTube', host: /(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/ },
+  { id: 'primevideo', label: 'Prime Video', host: /(^|\.)primevideo\.com$/ },
+];
 
 /**
  * Runs in the page's MAIN world, where the scriptlet and popup-guard globals live.
@@ -52,7 +62,10 @@ function readPageDiagnostics(): PageDiagnostics {
     cosmetic: d.winnowerCosmetic != null ? Number(d.winnowerCosmetic) : null,
     collapsed: d.winnowerCollapsedCount != null ? Number(d.winnowerCollapsedCount) : null,
     off: d.winnowerOff === '1',
-    scriptlets: window.__winnower_youtube?.rules ?? null,
+    scriptlets: {
+      youtube: window.__winnower_youtube?.rules ?? null,
+      primevideo: window.__winnower_primevideo?.rules ?? null,
+    },
     popupGuard: window.__winnowerPopupStats ?? null,
   };
 }
@@ -89,10 +102,12 @@ async function renderDiagnostics() {
     setDiag('d-collapsed', diag.collapsed == null ? 'pending' : String(diag.collapsed), diag.collapsed ? 'ok' : 'na');
   }
 
-  const isYouTube = /(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/.test(hostname);
-  if (!isYouTube) setDiag('d-scriptlets', 'not this site', 'na');
-  else if (diag.scriptlets) setDiag('d-scriptlets', `${diag.scriptlets} rules ✓`, 'ok');
-  // On YouTube but absent: the MAIN-world script did not inject. Worth shouting.
+  const site = SCRIPTLET_SITES.find((s) => s.host.test(hostname));
+  $('d-scriptlets-label').textContent = site?.label ?? 'Site scripts';
+  const rules = site ? diag.scriptlets[site.id] : null;
+  if (!site) setDiag('d-scriptlets', 'none for this site', 'na');
+  else if (rules) setDiag('d-scriptlets', `${rules} rules ✓`, 'ok');
+  // On a site with a bundle but absent: the MAIN-world script did not inject. Worth shouting.
   else setDiag('d-scriptlets', 'NOT LOADED', 'warn');
 
   if (!diag.popupGuard) setDiag('d-popups', 'guard not loaded', 'warn');

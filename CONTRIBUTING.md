@@ -51,7 +51,8 @@ their settings are lost.
 [Conventional Commits](https://www.conventionalcommits.org): `type(scope): summary`. The summary
 is in the imperative, lowercase, with no trailing period.
 
-Scopes: `filters`, `youtube`, `popup` (winnower's menu), `build`, `brand`, `deps`, `ci`, `release`.
+Scopes: `filters`, `youtube`, `primevideo`, `popup` (winnower's menu), `build`, `brand`, `deps`, `ci`,
+`release`.
 
 ```
 fix(filters): stop hiding the comment box on news sites

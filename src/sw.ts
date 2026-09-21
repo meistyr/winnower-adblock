@@ -188,7 +188,7 @@ async function syncAllowRules() {
 }
 
 /**
- * Register the MAIN-world scripts (YouTube scriptlets, popup guard) to match
+ * Register the MAIN-world scripts (site scriptlets, popup guard) to match
  * the current switches.
  *
  * These cannot live in the manifest. They run at document_start in the MAIN

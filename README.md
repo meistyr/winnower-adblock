@@ -22,6 +22,7 @@
 |---|---|
 | Ads, banners and trackers | About 130,000 network rules from ten community filter lists |
 | YouTube ads | Blocks ads on YouTube, including pre-roll and mid-roll |
+| Prime Video ads | Blocks ad breaks in films and shows on primevideo.com |
 | Leftover ad boxes | Hides ad containers on the page and collapses the gaps they leave |
 | Popups and popunders | Blocks popups and popunders from known ad networks |
 
@@ -112,4 +113,4 @@ under their own licences:
 | EasyList Cookie List, Fanboy's Annoyance List | [EasyList](https://easylist.to/) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | Ad and tracking server list | [Peter Lowe](https://pgl.yoyo.org/adservers/) | No licence stated; its site welcomes combining it with other lists |
 
-Not affiliated with YouTube or Google.
+Not affiliated with YouTube, Google or Amazon.

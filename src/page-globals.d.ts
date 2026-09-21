@@ -9,4 +9,6 @@ interface Window {
   __winnowerPopupStats?: { hosts: number; blocked: number };
   /** build/build-scriptlets.ts: rules loaded in the YouTube scriptlet bundle. */
   __winnower_youtube?: { rules: number; version: string };
+  /** build/build-scriptlets.ts: rules loaded in the Prime Video scriptlet bundle. */
+  __winnower_primevideo?: { rules: number; version: string };
 }
