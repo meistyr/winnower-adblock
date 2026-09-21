@@ -17,6 +17,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { LISTS } from './lists.config.ts';
+import { crossListCancels, filterKey } from './badfilter.ts';
 import type { PopupPatterns } from '../src/shared/catalogue.ts';
 
 const LISTS_DIR = new URL('../lists/', import.meta.url);
@@ -57,7 +58,7 @@ function parseRule(line: string): ParsedRule | null {
   const pattern = body.slice(0, dollar);
   const opts = body.slice(dollar + 1).split(',');
   if (!opts.includes('popup')) return null;
-  if (opts.includes('badfilter')) return null; // disables another rule; not ours to apply
+  if (opts.includes('badfilter')) return null; // a cancel, not a rule; main() applies it
 
   const out: ParsedRule = { isException, pattern, thirdParty: false, domains: [], excludedDomains: [] };
   for (const o of opts) {
@@ -108,10 +109,19 @@ function toDnr(parsed: ParsedRule, id: number): PopupRule | null {
 async function main() {
   const seen = new Set<string>();
   const parsed: ParsedRule[] = [];
-  let raw = 0, badfilter = 0;
+  let raw = 0, badfilter = 0, cancelled = 0;
+
+  // Every list's popup rules end up in one ruleset, so a $badfilter cancels its
+  // rule whichever list either is in, its own included. Reading the lists here
+  // rather than through convert-network.ts meant no cancel was applied at all,
+  // and EasyList's popup block on bare IP addresses stayed on after uBlock's
+  // lists had switched it off. See build/badfilter.ts.
+  const texts = new Map<string, string>();
+  for (const l of LISTS) texts.set(l.name, await readFile(new URL(`${l.name}.txt`, LISTS_DIR), 'utf8'));
+  const cancels = crossListCancels(LISTS, (name) => texts.get(name)!);
 
   for (const l of LISTS) {
-    const txt = await readFile(new URL(`${l.name}.txt`, LISTS_DIR), 'utf8');
+    const txt = texts.get(l.name)!;
     for (const line of txt.split('\n')) {
       const t = line.trim();
       if (!t || t.startsWith('!') || t.startsWith('[')) continue;
@@ -120,6 +130,11 @@ async function main() {
       if (seen.has(t)) continue;
       seen.add(t);
       raw += 1;
+      const key = filterKey(t);
+      if (key && !key.badfilter && cancels.has(key.key)) {
+        cancelled += 1;
+        continue;
+      }
       const p = parseRule(t);
       if (!p) { badfilter += 1; continue; }
       parsed.push(p);
@@ -183,6 +198,7 @@ async function main() {
   console.log('');
   console.log(`  $popup rules found     ${String(raw).padStart(7)}`);
   console.log(`  badfilter/unparsed     ${String(badfilter).padStart(7)}`);
+  console.log(`  cancelled by a list    ${String(cancelled).padStart(7)}`);
   console.log(`  refused (unsafe)       ${String(refused).padStart(7)}   bare pattern with no initiator, or wildcard-only domains`);
   console.log(`  DNR rules emitted      ${String(rules.length).padStart(7)}   ${blocks} block / ${allows} allow`);
   console.log(`  window.open hosts      ${String(hosts.size).padStart(7)}   + ${thirdPartyHosts.size} third-party only, ${allowHosts.size} excepted`);

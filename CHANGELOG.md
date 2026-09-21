@@ -15,6 +15,12 @@ All notable changes to winnower are documented here. The format follows
   individual sites, which it skipped until now. From the lists that are on by default, that is
   about 2,500 rules across 3,500 sites. Each list's fixes follow its switch in winnower's menu.
 
+### Fixed
+
+- **Rules the lists switch off:** uBlock's lists switch off some rules from other lists because
+  they break sites, and winnower was still applying 118 of them. It now leaves them off, as uBlock
+  Origin does.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added

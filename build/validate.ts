@@ -14,9 +14,12 @@ import { collapseVerdict, type BoxFacts, type Verdict } from '../src/shared/coll
 import { formatLine, groupRepeats, isAlwaysKept, type LogLine } from '../src/shared/log.ts';
 import { isNewer } from '../src/shared/version.ts';
 import { checkSwitches } from './check-switches.ts';
+import { crossListCancels, filterKey } from './badfilter.ts';
+import { LISTS } from './lists.config.ts';
 
 const RULES_DIR = new URL('../extension/rules/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
+const LISTS_DIR = new URL('../lists/', import.meta.url);
 
 const MAX_REGEXP_RULES = 1_000;
 const MAX_PRIORITY = 2_147_483_647;
@@ -119,6 +122,56 @@ console.log(`  regexp     ${totalRegexp.toLocaleString()} / ${MAX_REGEXP_RULES.t
 console.log('');
 
 console.log(`  priority   max static ${maxStaticPriority.toLocaleString()} < allowlist ${ALLOWLIST_PRIORITY.toLocaleString()}`);
+console.log('');
+
+// Cancels across lists (build/badfilter.ts). A rule another list cancels must
+// be gone from its own list's ruleset, and the replacement the cancelling list
+// usually adds must still be there, or the fix would have removed blocking
+// rather than narrowed it. Checked on whole-host rules (`||host^`, no options),
+// the only shape whose converted form is certain: urlFilter equal to the rule,
+// with no party condition. Both directions: an uncancelled rule of the same
+// shape must survive, or a check that only expects absence would pass on a
+// build that dropped everything.
+type HostRule = { action: { type: string }; condition: { urlFilter?: string; domainType?: string } };
+const listText = new Map<string, string>();
+for (const l of LISTS) listText.set(l.name, await readFile(new URL(`${l.name}.txt`, LISTS_DIR), 'utf8'));
+const cancels = crossListCancels(LISTS, (name) => listText.get(name)!);
+const ruleset = async (name: string) => JSON.parse(await readFile(new URL(`${name}.json`, RULES_DIR), 'utf8')) as HostRule[];
+const blocksHost = (rules: HostRule[], rule: string, domainType?: string) =>
+  rules.some((r) => r.action.type === 'block' && r.condition.urlFilter === rule && r.condition.domainType === domainType);
+
+const peterLowe = await ruleset('peter-lowe');
+const hostRules = listText.get('peter-lowe')!.split('\n').map((l) => l.trim()).filter((l) => /^\|\|[a-z0-9.-]+\^$/.test(l));
+const cancelledHere = hostRules.filter((l) => {
+  const from = cancels.get(filterKey(l)!.key);
+  return from && !(from.size === 1 && from.has('peter-lowe'));
+});
+const stillThere = cancelledHere.filter((l) => blocksHost(peterLowe, l));
+const survivor = hostRules.find((l) => !cancels.has(filterKey(l)!.key));
+const unbreak = await ruleset('ubo-unbreak');
+// The popup ruleset merges every list's $popup rules through its own converter,
+// which applied no cancels until it was checked here.
+const popupRules = await ruleset('popup');
+const cancelledPopups = [...listText.values()]
+  .flatMap((t) => t.split('\n').map((l) => l.trim()))
+  .filter((l) => !l.startsWith('@@') && /(^|,)popup(,|$)/.test(l.slice(l.lastIndexOf('$') + 1)))
+  .filter((l) => {
+    const k = filterKey(l);
+    return !!k && !k.badfilter && cancels.has(k.key);
+  });
+const popupLeft = cancelledPopups.filter((l) => popupRules.some((r) => r.condition.urlFilter === l.slice(0, l.lastIndexOf('$'))));
+const BADFILTER_CASES: [string, boolean, string][] = [
+  ['cancels found across the lists', cancels.size > 0, `${cancels.size} cancels`],
+  ['cancelled Peter Lowe rules are gone', cancelledHere.length > 0 && stillThere.length === 0, `${cancelledHere.length - stillThere.length} / ${cancelledHere.length} gone${stillThere.length ? `, left: ${stillThere.slice(0, 3).join(' ')}` : ''}`],
+  ['||top.mail.ru^ gone from peter-lowe', !blocksHost(peterLowe, '||top.mail.ru^'), 'was an unconditional block'],
+  ['its third-party replacement kept', blocksHost(unbreak, '||top.mail.ru^', 'thirdParty'), 'ubo-unbreak, thirdParty'],
+  ['an uncancelled rule survives', !!survivor && blocksHost(peterLowe, survivor), survivor ?? 'none found'],
+  ['cancelled popup rules are gone', popupLeft.length === 0, `${cancelledPopups.length - popupLeft.length} / ${cancelledPopups.length} gone`],
+];
+for (const [label, ok, detail] of BADFILTER_CASES) {
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  badfilter: ${label.padEnd(38)} ${detail}`);
+  if (!ok) problems.push(`badfilter: ${label}, ${detail}`);
+}
 console.log('');
 if (maxStaticPriority >= ALLOWLIST_PRIORITY) {
   problems.push(

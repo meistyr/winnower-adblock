@@ -16,10 +16,15 @@
  *
  * Filters that need regex lookahead cannot be converted. DNR compiles regexFilter
  * with RE2, which has no lookahead, so the converter reports and drops them.
+ *
+ * Converting each list on its own has one cost: a `$badfilter` in one list
+ * cannot reach the rule it cancels in another. Those rules are left out of the
+ * text before conversion instead. See build/badfilter.ts.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { Filter, FilterConverter } from '@adguard/dnr-converter';
 import { LISTS, type FilterList } from './lists.config.ts';
+import { crossListCancels, withoutCancelled } from './badfilter.ts';
 import type { BuildStats, ListStats } from '../src/shared/catalogue.ts';
 
 const LISTS_DIR = new URL('../lists/', import.meta.url);
@@ -36,8 +41,7 @@ const MAX_REGEXP_RULES = 1_000;
 const PER_LIST_MAX_RULES = 150_000;
 const PER_LIST_MAX_REGEXP = 1_000;
 
-async function convertList(list: FilterList, filterId: number): Promise<ListStats> {
-  const content = await readFile(new URL(`${list.name}.txt`, LISTS_DIR), 'utf8');
+async function convertList(list: FilterList, filterId: number, content: string): Promise<ListStats> {
   const converter = new FilterConverter();
   const [result] = await converter.convert([new Filter(filterId, content)], {
     maxNumberOfRules: PER_LIST_MAX_RULES,
@@ -65,13 +69,21 @@ async function convertList(list: FilterList, filterId: number): Promise<ListStat
 async function main() {
   await mkdir(RULES_DIR, { recursive: true });
 
+  const texts = new Map<string, string>();
+  for (const list of LISTS) texts.set(list.name, await readFile(new URL(`${list.name}.txt`, LISTS_DIR), 'utf8'));
+  const cancels = crossListCancels(LISTS, (name) => texts.get(name)!);
+
   const stats: ListStats[] = [];
+  let cancelled = 0;
   for (const [i, list] of LISTS.entries()) {
     process.stdout.write(`  converting ${list.name.padEnd(20)}`);
-    const s = await convertList(list, i + 1);
+    const { text, removed } = withoutCancelled(list.name, texts.get(list.name)!, cancels);
+    cancelled += removed;
+    const s = await convertList(list, i + 1, text);
     stats.push(s);
-    console.log(`${String(s.rules).padStart(7)} rules`);
+    console.log(`${String(s.rules).padStart(7)} rules${removed ? `   (${removed} cancelled by other lists)` : ''}`);
   }
+  console.log(`  ${cancelled} rules left out because another list cancels them`);
 
   const pad = (s: string | number, n: number) => String(s).padEnd(n);
   const num = (s: string | number, n: number) => String(s).padStart(n);
