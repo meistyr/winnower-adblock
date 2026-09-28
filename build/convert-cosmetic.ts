@@ -27,40 +27,78 @@ const OUT_DIR = new URL('../extension/cosmetic/', import.meta.url);
 
 const RE = /^(.*?)(#@?\$?\??#)(.+)$/;
 
-/** Selectors per CSS rule. See the note where generic.css is written. */
-const CHUNK = 500;
+/**
+ * Selectors per CSS rule. Small, because a plain comma list is not forgiving:
+ * one selector Chrome rejects drops every other selector in its rule. See the
+ * note where generic.css is written.
+ */
+const CHUNK = 100;
+
+/** The kill switch every generic rule sits behind. */
+const GATE ='html:not([data-winnower-off])';
 
 /**
- * Emit `html:not([data-winnower-off]) :is(a, b, c) {display:none!important}`.
+ * Selectors that name <html> themselves, e.g. `html > #bw-cf-root`.
  *
- * Two things this buys beyond chunking:
+ * Nested under GATE they would read "an <html> inside <html>", which never
+ * exists, so they would silently hide nothing. They keep the :is() form, where
+ * the selector is matched whole. There are about twenty, so the cost described
+ * below does not apply to them in any way that matters.
+ */
+const NAMES_ROOT = /^(?:html|:root)(?![\w-])/i;
+
+/**
+ * Emit generic.css as comma lists nested in one gated block:
+ *
+ *   html:not([data-winnower-off]) {
+ *     .a, .b, .c {display:none!important;--winnower-hid:1}
+ *   }
+ *
+ * THE SHAPE IS A PERFORMANCE DECISION, NOT STYLE. Chrome files each rule under
+ * the last part of its selector (a class, id, tag or attribute), and tests an
+ * element only against the rules filed under what that element has. This was
+ * once `html:not(...) :is(a, b, c, ...500)`, and a rule ending in a 500-way
+ * :is() cannot be filed that way, so every element was tested against all
+ * ~41k selectors on every style recalculation. Measured in Chromium 154:
+ * theverge.com spent 5.0s per load on style work, against 0.2s with no
+ * extension, and scrolling Bing Images stalled for up to 2s at a time. In a
+ * comma list, each selector is filed on its own.
+ *
+ * Nested rather than prefixed on every selector, because each frame parses
+ * its own copy of this file. Nesting writes the gate once and keeps the file
+ * the size it was; repeating it made the file 2-3x larger and page loads with
+ * many frames correspondingly slower.
+ *
+ * What the old shape was for, and where each part went:
  *
  * 1. A kill switch. Manifest-injected CSS cannot be removed by a content
  *    script, so without a guard like this the per-site allowlist could not
- *    restore a site that cosmetic filtering had broken, which is the main
- *    reason to have an allowlist at all. Setting the attribute on <html>
- *    disables every rule at once, instantly.
+ *    restore a site that cosmetic filtering had broken. Setting the attribute
+ *    on <html> disables every rule at once. Kept, as the outer block.
  *
- * 2. :is() has FORGIVING selector parsing. A single invalid selector in a
- *    plain comma list invalidates the entire rule; inside :is() it is ignored
- *    and its siblings still apply. That is a real safety gain given ~41k
- *    selectors from upstream lists we do not control.
- *
- * :is() takes the specificity of its most specific argument, and the html
- * prefix adds a little more. With !important that still wins in practice.
+ * 2. Forgiving parsing. Inside :is() an invalid selector is ignored and its
+ *    siblings still apply; in a plain list it takes the whole rule with it.
+ *    That protection is now partial: selectorLooksSafe drops what Chrome is
+ *    known to reject, and CHUNK caps what one miss can cost. When this was
+ *    changed, Chrome rejected none of the 41,026 generic selectors.
  *
  * 3. Provenance. HIDE_DECLARATION carries a marker as well as display:none, so
  *    src/collapse.ts can tell a box winnower emptied from a box the page
  *    emptied itself. Without it the collapser treated any hidden element as
- *    proof of its own work and hid twitch.tv's video player.
+ *    proof of its own work and hid twitch.tv's video player. Kept, on every
+ *    rule.
  */
 function chunkToCss(selectors: string[]): string {
+  const rootNamed = selectors.filter((s) => NAMES_ROOT.test(s));
+  const nestable = selectors.filter((s) => !NAMES_ROOT.test(s));
+
   const parts: string[] = [];
-  for (let i = 0; i < selectors.length; i += CHUNK) {
-    const group = selectors.slice(i, i + CHUNK).join(',\n');
-    parts.push(`html:not([data-winnower-off]) :is(\n${group}\n)${HIDE_DECLARATION}`);
+  for (let i = 0; i < nestable.length; i += CHUNK) {
+    parts.push(nestable.slice(i, i + CHUNK).join(',\n') + HIDE_DECLARATION);
   }
-  return parts.join('\n') + '\n';
+  let css = `${GATE} {\n${parts.join('\n')}\n}\n`;
+  if (rootNamed.length) css += `${GATE} :is(\n${rootNamed.join(',\n')}\n)${HIDE_DECLARATION}\n`;
+  return css;
 }
 
 /**

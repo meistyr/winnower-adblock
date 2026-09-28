@@ -15,6 +15,12 @@ All notable changes to winnower are documented here. The format follows
   individual sites, which it skipped until now. From the lists that are on by default, that is
   about 2,500 rules across 3,500 sites. Each list's fixes follow its switch in winnower's menu.
 
+### Changed
+
+- **Faster pages:** busy pages load and scroll faster, most noticeably image searches and news
+  sites. Chrome now only checks the hiding rules that could apply to each part of a page, instead
+  of all of them. The same elements are hidden as before.
+
 ### Fixed
 
 - **Rules the lists switch off:** uBlock's lists switch off some rules from other lists because

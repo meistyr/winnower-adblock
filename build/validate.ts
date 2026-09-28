@@ -216,6 +216,21 @@ console.log(`  hide rules marked   ${marked.toLocaleString().padStart(8)} / ${hi
 if (hideBlocks === 0) problems.push('generic.css contains no hide rules at all');
 if (marked !== hideBlocks) problems.push(`${hideBlocks - marked} hide rules in generic.css carry no ${HID_MARKER}; the collapser is blind to whatever they hide`);
 
+// The shape of generic.css decides whether Chrome can skip rules that cannot
+// apply to an element. A rule wrapped in one big :is() cannot be skipped, and
+// that cost theverge.com 5s of style work per load. See chunkToCss in
+// build/convert-cosmetic.ts. Asserted both ways: most selectors sit in the
+// nested comma lists, and the one :is() rule left holds only a handful.
+const genericRules = genericCss.split(HIDE_DECLARATION).slice(0, -1);
+const selectorCount = (block: string) => block.split(',\n').length;
+const wrapped = genericRules.filter((b) => /:is\(\n/.test(b));
+const largestWrapped = Math.max(0, ...wrapped.map(selectorCount));
+const nestedSelectors = genericRules.filter((b) => !/:is\(\n/.test(b)).reduce((n, b) => n + selectorCount(b), 0);
+console.log(`  generic.css shape   ${nestedSelectors.toLocaleString().padStart(8)} selectors in nested lists, largest :is() rule ${largestWrapped}`);
+if (!genericCss.startsWith('html:not([data-winnower-off]) {')) problems.push('generic.css does not open with the gated nesting block; the off switch may not cover it');
+if (nestedSelectors < 1_000) problems.push(`only ${nestedSelectors} generic selectors are in nested comma lists; Chrome cannot skip the rest when styling a page`);
+if (largestWrapped > 100) problems.push(`generic.css has an :is() rule of ${largestWrapped} selectors; every element on every page is tested against all of them`);
+
 // The collapser's judgement, asked directly. It is the part that has gone
 // wrong, twice, and neither failure was reachable from a browser test in time
 // to matter. Both directions asserted: a suite that only ever expects "skip"
