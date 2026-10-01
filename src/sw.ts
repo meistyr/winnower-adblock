@@ -293,7 +293,20 @@ ensureColorSchemeWatcher().catch(() => {});
 
 // --- badge ------------------------------------------------------------------
 
-const blockedByTab = new Map<number, number>();
+/**
+ * Blocked addresses per tab, counted once each until the tab next loads a page.
+ * Counting every match made the badge a measure of how often a page retries:
+ * Netflix's player logs about twice a second, paused or not, and passed a
+ * thousand in ten minutes. The query string and fragment are dropped, so a
+ * tracker that adds a cache-buster to every ping still counts once.
+ */
+const blockedByTab = new Map<number, Set<string>>();
+
+/** The part of a request URL that counts as its address: no query, no fragment. */
+function blockedAddress(url: string): string {
+  const cut = url.search(/[?#]/);
+  return cut === -1 ? url : url.slice(0, cut);
+}
 
 // --- update check -----------------------------------------------------------
 
@@ -359,7 +372,7 @@ async function checkUpdate(force = false): Promise<{ latest: string; newer: bool
 }
 
 function setBadge(tabId: number) {
-  const n = blockedByTab.get(tabId) ?? 0;
+  const n = blockedByTab.get(tabId)?.size ?? 0;
   // A tint alone cannot carry the news: the badge is only drawn when there is
   // something in it, so on a page where nothing was blocked there would be no
   // badge to tint. A dot gives the tint something to colour.
@@ -394,14 +407,17 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
     // a handful of allow rules elsewhere can still be counted.
     const rs = info.rule?.rulesetId;
     if (rs === '_dynamic' || rs === 'ubo-unbreak') return;
-    blockedByTab.set(tabId, (blockedByTab.get(tabId) ?? 0) + 1);
-    setBadge(tabId);
+    const seen = blockedByTab.get(tabId) ?? new Set<string>();
+    blockedByTab.set(tabId, seen);
+    const before = seen.size;
+    seen.add(blockedAddress(info.request.url));
+    if (seen.size !== before) setBadge(tabId);
   });
 }
 
 chrome.webNavigation?.onCommitted?.addListener((d) => {
   if (d.frameId !== 0) return;
-  blockedByTab.set(d.tabId, 0);
+  blockedByTab.set(d.tabId, new Set());
   setBadge(d.tabId);
 });
 
@@ -423,7 +439,7 @@ async function buildState(tabId: number | undefined, hostname: string): Promise<
     allowlisted: await isAllowlisted(hostname),
     master,
     allowlist,
-    blocked: (tabId === undefined ? undefined : blockedByTab.get(tabId)) ?? 0,
+    blocked: (tabId === undefined ? undefined : blockedByTab.get(tabId)?.size) ?? 0,
     rulesets: catalogue.map((r) => ({ ...r, enabled: enabled.includes(r.id) })),
     dev,
     recorded: logLines.length,

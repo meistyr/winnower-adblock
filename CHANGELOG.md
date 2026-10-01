@@ -12,6 +12,13 @@ All notable changes to winnower are documented here. The format follows
   shows on netflix.com. The row under **On this page** in winnower's menu
   counts the breaks skipped, and warns if it cannot find Netflix's player while a video is open.
 
+### Changed
+
+- **Blocked count:** the number on winnower's toolbar icon, and **blocked on this tab** in its
+  menu, now count each blocked address once per page. Before, a page that kept retrying the same
+  tracker added one every time, so Netflix passed a thousand in ten minutes while paused. Expect
+  lower numbers on most sites.
+
 ## [0.4.0] - 2026-09-28
 
 ### Added
