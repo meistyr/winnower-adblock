@@ -23,6 +23,7 @@
 | Ads, banners and trackers | About 130,000 network rules from ten community filter lists |
 | YouTube ads | Blocks ads on YouTube, including pre-roll and mid-roll |
 | Prime Video ads | Blocks ad breaks in films and shows on primevideo.com |
+| Netflix ads | Blocks ad breaks and pause ads in films and shows on netflix.com |
 | Site fixes | Runs the fixes the filter lists carry for individual sites, on about 3,500 sites |
 | Leftover ad boxes | Hides ad containers on the page and collapses the gaps they leave |
 | Popups and popunders | Blocks popups and popunders from known ad networks |
@@ -30,7 +31,7 @@
 From the toolbar you can pause winnower on the site you're on, switch filter lists on and off,
 or turn it off everywhere.
 
-Streaming ads that are stitched into the video itself are not blocked.
+Ads stitched into the video stream itself on other streaming services are not blocked.
 
 winnower collects nothing about you and has no server to collect it to. The filter lists ship
 inside the extension. The one thing it asks anyone for is GitHub's latest version number, once a
@@ -114,4 +115,4 @@ under their own licences:
 | EasyList Cookie List, Fanboy's Annoyance List | [EasyList](https://easylist.to/) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | Ad and tracking server list | [Peter Lowe](https://pgl.yoyo.org/adservers/) | No licence stated; its site welcomes combining it with other lists |
 
-Not affiliated with YouTube, Google or Amazon.
+Not affiliated with YouTube, Google, Amazon or Netflix.

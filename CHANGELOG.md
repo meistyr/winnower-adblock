@@ -6,6 +6,12 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Netflix ad blocking:** blocks ad breaks and the ad shown while a video is paused, in films and
+  shows on netflix.com. The row under **On this page** in winnower's menu
+  counts the breaks skipped, and warns if it cannot find Netflix's player while a video is open.
+
 ## [0.4.0] - 2026-09-28
 
 ### Added

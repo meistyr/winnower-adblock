@@ -40,6 +40,8 @@ interface PageDiagnostics {
   /** Rules loaded per scriptlet bundle, by group id; null where it did not load. */
   scriptlets: Record<string, number | null>;
   popupGuard: { hosts: number; blocked: number } | null;
+  /** src/netflix.ts; null where it did not load. Not a scriptlet bundle, so reported apart. */
+  netflix: { found: boolean; skipped: number; reseeks: number } | null;
 }
 
 /**
@@ -49,6 +51,7 @@ interface PageDiagnostics {
 const SCRIPTLET_SITES = [
   { id: 'youtube', label: 'YouTube', host: /(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/ },
   { id: 'primevideo', label: 'Prime Video', host: /(^|\.)primevideo\.com$/ },
+  { id: 'netflix', label: 'Netflix', host: /(^|\.)netflix\.com$/ },
 ];
 
 /**
@@ -67,6 +70,7 @@ function readPageDiagnostics(): PageDiagnostics {
       primevideo: window.__winnower_primevideo?.rules ?? null,
     },
     popupGuard: window.__winnowerPopupStats ?? null,
+    netflix: window.__winnower_netflix ?? null,
   };
 }
 
@@ -106,6 +110,15 @@ async function renderDiagnostics() {
   $('d-scriptlets-label').textContent = site?.label ?? 'Site scripts';
   const rules = site ? diag.scriptlets[site.id] : null;
   if (!site) setDiag('d-scriptlets', 'none for this site', 'na');
+  else if (site.id === 'netflix' && diag.netflix) {
+    const { found, skipped } = diag.netflix;
+    // Off a watch page there is no player to find, so only a watch page can tell
+    // that Netflix has changed the internals src/netflix.ts relies on.
+    const watching = new URL(tab.url ?? 'about:blank').pathname.startsWith('/watch');
+    if (found) setDiag('d-scriptlets', skipped ? `${skipped} ad break${skipped === 1 ? '' : 's'} skipped` : 'ready', 'ok');
+    else if (watching) setDiag('d-scriptlets', 'player not found', 'warn');
+    else setDiag('d-scriptlets', 'waiting for a video', 'na');
+  }
   else if (rules) setDiag('d-scriptlets', `${rules} rules ✓`, 'ok');
   // On a site with a bundle but absent: the MAIN-world script did not inject. Worth shouting.
   else setDiag('d-scriptlets', 'NOT LOADED', 'warn');

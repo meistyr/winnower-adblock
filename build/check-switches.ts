@@ -313,6 +313,12 @@ export async function checkSwitches(): Promise<CheckResult> {
   const paused = listScript?.excludeMatches?.includes('*://*.amazon.com/*') ?? false;
   note(paused, 'list scriptlets skip paused sites', paused ? 'amazon.com excluded' : 'amazon.com not excluded');
 
+  // The hand-made scripts take the same exclusions. Netflix's is checked by name
+  // because it is the newest, and the only one that drives a player directly.
+  const netflix = probe.registered.find((s) => s.id === 'winnower-netflix');
+  const netflixPaused = netflix?.excludeMatches?.includes('*://*.amazon.com/*') ?? false;
+  note(netflixPaused, 'netflix script skips paused sites', !netflix ? 'not registered' : netflixPaused ? 'registered, amazon.com excluded' : 'amazon.com not excluded');
+
   // Two switches flipped before the first sync finishes. Each sync unregisters
   // and registers again, so overlapping runs re-register ids the other has
   // already put back. Both lists must end up registered, with no error.

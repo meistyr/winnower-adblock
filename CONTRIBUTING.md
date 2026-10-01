@@ -51,7 +51,7 @@ their settings are lost.
 [Conventional Commits](https://www.conventionalcommits.org): `type(scope): summary`. The summary
 is in the imperative, lowercase, with no trailing period.
 
-Scopes: `filters`, `youtube`, `primevideo`, `popup` (winnower's menu), `build`, `brand`, `deps`, `ci`,
+Scopes: `filters`, `youtube`, `primevideo`, `netflix`, `popup` (winnower's menu), `build`, `brand`, `deps`, `ci`,
 `release`.
 
 ```

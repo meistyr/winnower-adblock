@@ -106,7 +106,7 @@ async function main() {
   }
   const dynamicFiles = [...SCRIPTLET_GROUPS.map((g) => `scriptlets/${g.id}.js`), ...listScriptlets.map((s) => s.file)];
   const iconFiles = (['light', 'dark'] as const).flatMap((g) => Object.values(iconSet(g, [16, 32, 48, 128])));
-  for (const extra of ['sw.js', 'cosmetic/generic.css', 'popup-guard.js', 'popup.html', 'popup.js', 'offscreen.html', 'offscreen.js', 'LICENSE.txt', 'icons/lockup-popup.svg', ...iconFiles, ...dynamicFiles]) {
+  for (const extra of ['sw.js', 'cosmetic/generic.css', 'popup-guard.js', 'netflix.js', 'popup.html', 'popup.js', 'offscreen.html', 'offscreen.js', 'LICENSE.txt', 'icons/lockup-popup.svg', ...iconFiles, ...dynamicFiles]) {
     try {
       await access(new URL(extra, EXT_DIR));
     } catch {
@@ -187,6 +187,16 @@ async function main() {
       id: 'winnower-popup-guard',
       matches: ['<all_urls>'],
       js: ['popup-guard.js'],
+      runAt: 'document_start',
+      world: 'MAIN',
+      allFrames: false,
+    },
+    // Hand-written, not a scriptlet group: it drives the player's own ad
+    // manager, which no scriptlet can do. See src/netflix.ts.
+    {
+      id: 'winnower-netflix',
+      matches: ['*://*.netflix.com/*'],
+      js: ['netflix.js'],
       runAt: 'document_start',
       world: 'MAIN',
       allFrames: false,

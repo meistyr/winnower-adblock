@@ -11,4 +11,8 @@ interface Window {
   __winnower_youtube?: { rules: number; version: string };
   /** build/build-scriptlets.ts: rules loaded in the Prime Video scriptlet bundle. */
   __winnower_primevideo?: { rules: number; version: string };
+  /** Set by netflix.ts so a second injection does not start a second watcher. */
+  __winnowerNetflix?: boolean;
+  /** netflix.ts: whether the player's ad manager was reached, and what it did. */
+  __winnower_netflix?: { found: boolean; skipped: number; reseeks: number };
 }
