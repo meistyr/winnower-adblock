@@ -6,6 +6,8 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-01
+
 ### Added
 
 - **Netflix ad blocking:** blocks ad breaks and the ad shown while a video is paused, in films and
@@ -133,7 +135,8 @@ First release.
 - **Release zip:** loads with Load unpacked, with `CREDITS.txt` naming every filter list and the
   licence it declares.
 
-[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.5.0
 [0.4.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.4.0
 [0.3.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.3.0
 [0.2.1]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.2.1
