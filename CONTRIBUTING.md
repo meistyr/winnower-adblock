@@ -81,7 +81,7 @@ people reading the code.
 | Label | Meaning |
 | --- | --- |
 | `type:bug` `type:feature` `type:chore` `type:docs` | What kind of work it is |
-| `area:filters` `area:youtube` `area:popup` `area:build` `area:brand` | Which part of winnower (`popup` is winnower's menu) |
+| `area:filters` `area:streaming` `area:popup` `area:build` `area:brand` | Which part of winnower (`popup` is winnower's menu) |
 | `report:site-broken` `report:missed-ad` | Reports from people using winnower |
 | `blocked:luke` | Waiting on a decision, a credential or an approval |
 | `ready` | Decided and ready to build |
