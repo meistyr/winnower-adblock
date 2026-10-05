@@ -113,7 +113,18 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
   },
   {
     id: 'primevideo',
-    matches: ['*://*.primevideo.com/*'],
+    // Amazon's own storefronts also serve Prime Video, under /gp/video, and
+    // under a language prefix such as /-/es/gp/video. Only these four do: on
+    // amazon.fr, .ca, .in and the rest /gp/video is a 404, and those countries
+    // use primevideo.com. Paths, not the whole host, so shopping pages are left
+    // alone.
+    matches: [
+      '*://*.primevideo.com/*',
+      ...['com', 'co.uk', 'de', 'co.jp'].flatMap((tld) => [
+        `*://*.amazon.${tld}/gp/video/*`,
+        `*://*.amazon.${tld}/-/*/gp/video/*`,
+      ]),
+    ],
     rules: [
       // GetVodPlaybackResources returns the title as a playlist,
       // intraTitlePlaylist, of chapters (type "Main") and ad breaks (type

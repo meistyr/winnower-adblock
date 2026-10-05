@@ -51,6 +51,12 @@ interface PageDiagnostics {
 const SCRIPTLET_SITES = [
   { id: 'youtube', label: 'YouTube', host: /(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/ },
   { id: 'primevideo', label: 'Prime Video', host: /(^|\.)primevideo\.com$/ },
+  {
+    id: 'primevideo',
+    label: 'Prime Video',
+    host: /(^|\.)amazon\.(com|co\.uk|de|co\.jp)$/,
+    path: /^(\/-\/[^/]+)?\/gp\/video\//,
+  },
   { id: 'netflix', label: 'Netflix', host: /(^|\.)netflix\.com$/ },
 ];
 
@@ -106,7 +112,8 @@ async function renderDiagnostics() {
     setDiag('d-collapsed', diag.collapsed == null ? 'pending' : String(diag.collapsed), diag.collapsed ? 'ok' : 'na');
   }
 
-  const site = SCRIPTLET_SITES.find((s) => s.host.test(hostname));
+  const pathname = new URL(tab.url ?? 'about:blank').pathname;
+  const site = SCRIPTLET_SITES.find((s) => s.host.test(hostname) && (!s.path || s.path.test(pathname)));
   $('d-scriptlets-label').textContent = site?.label ?? 'Site scripts';
   const rules = site ? diag.scriptlets[site.id] : null;
   if (!site) setDiag('d-scriptlets', 'none for this site', 'na');

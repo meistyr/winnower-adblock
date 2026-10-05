@@ -6,6 +6,12 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Prime Video on Amazon:** ads were not blocked when you watched Prime Video on amazon.com,
+  amazon.co.uk, amazon.de or amazon.co.jp, only on primevideo.com. They are now blocked there too.
+  Shopping pages on those sites are unaffected.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added
