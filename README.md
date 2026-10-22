@@ -24,7 +24,7 @@
 | YouTube ads | Blocks ads on YouTube, including pre-roll and mid-roll |
 | Prime Video ads | Blocks ad breaks in films and shows on primevideo.com, and on Amazon's own Prime Video pages |
 | Netflix ads | Blocks ad breaks and pause ads in films and shows on netflix.com |
-| Site fixes | Runs the fixes the filter lists carry for individual sites, on about 3,500 sites |
+| Site fixes | Runs the fixes the filter lists carry for individual sites, on about 4,000 sites |
 | Leftover ad boxes | Hides ad containers on the page and collapses the gaps they leave |
 | Popups and popunders | Blocks popups and popunders from known ad networks |
 
