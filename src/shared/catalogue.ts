@@ -37,7 +37,10 @@ export interface ListScriptlet {
   name: string;
   /** Relative to extension/. */
   file: string;
+  /** Hosts, or with `wildcard` the names before `.*`. */
   hosts: string[];
+  /** The rules name any ending (`limetorrents.*`), so the file loads on every site. */
+  wildcard?: true;
 }
 
 /** Per-list conversion stats, as recorded in rules/_stats.json. */

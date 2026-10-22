@@ -15,9 +15,15 @@
  * The calls are made the way invoke() makes them, so a rule behaves the same
  * either way.
  *
+ * Hosts ending in `.*` (`limetorrents.*`, any ending) go to files of their
+ * own. Chrome's match patterns cannot express "any ending", so those files load
+ * on every site and check the hostname themselves; see WILDCARD_KEYS. Keeping
+ * them apart means a page loads only the wildcard tables everywhere, never the
+ * far larger exact-host ones.
+ *
  * Left out, and counted below (tracked in issue #8):
- *   - hosts ending in `.*`, and hosts written as a regular expression. Chrome's
- *     match patterns cannot express either.
+ *   - hosts written as a regular expression. Chrome's match patterns cannot
+ *     express them, and the files have no regex table.
  *   - rules the library's converter rejects, which includes every trusted-* rule.
  *   - hosts with a hand-made group in scriptlet-rules.ts. Those sites keep that
  *     group alone.
@@ -108,10 +114,14 @@ const OWN_HOSTS = SCRIPTLET_GROUPS.flatMap((g) =>
   g.matches.map((m) => /^\*:\/\/\*\.([^/]+)\/\*$/.exec(m)?.[1]).filter((h): h is string => !!h),
 );
 const isOwnHost = (h: string) => OWN_HOSTS.some((own) => h === own || h.endsWith('.' + own));
+/** `youtube.*` reaches youtube.com, which keeps its hand-made group alone. */
+const isOwnName = (name: string) => OWN_HOSTS.some((own) => own.startsWith(name + '.'));
 
 interface Group {
   list: string;
   name: string;
+  /** Keyed by the name before `.*` rather than by host. See WILDCARD_KEYS. */
+  wildcard: boolean;
   /** [args] or [args, hosts it must not run on]. */
   rules: Array<[string[]] | [string[], string[]]>;
   ruleIndex: Map<string, number>;
@@ -122,27 +132,48 @@ interface Group {
 interface Counts {
   rules: number;
   compiled: number;
+  /** Compiled rules that name at least one `.*` host. */
+  wildcard: number;
   trusted: number;
   rejected: number;
-  wildcardOnly: number;
   ownOnly: number;
   regexOnly: number;
   badHostOnly: number;
   exceptions: number;
 }
 const emptyCounts = (): Counts => ({
-  rules: 0, compiled: 0, trusted: 0, rejected: 0, wildcardOnly: 0, ownOnly: 0, regexOnly: 0, badHostOnly: 0, exceptions: 0,
+  rules: 0, compiled: 0, wildcard: 0, trusted: 0, rejected: 0, ownOnly: 0, regexOnly: 0, badHostOnly: 0, exceptions: 0,
 });
+
+/**
+ * The lookup keys of a wildcard file: each name in the hostname's chain with
+ * its last one or two labels taken off, so `limetorrents.*` reaches
+ * limetorrents.lol, limetorrents.co.uk and www.limetorrents.lol.
+ *
+ * uBlock decides the ending with the Public Suffix List, which is too large to
+ * put on every page. One or two labels covers endings like `.com` and `.co.uk`.
+ * The cost is that a name also matches as a subdomain of a two-label site
+ * (`limetorrents.example.com`), which the names in these lists are too
+ * specific to hit in practice.
+ */
+const WILDCARD_KEYS = `
+  const keys = [];
+  for (const h of chain) {
+    const parts = h.split('.');
+    for (let n = 1; n <= 2 && n < parts.length; n++) keys.push(parts.slice(0, -n).join('.'));
+  }
+`;
 
 /**
  * The runtime part of every file. It finds this page's calls by walking the
  * hostname up through its parent domains, because a rule for example.com also
  * applies on www.example.com. Exceptions are gathered the same way first.
+ * A wildcard file looks its calls up by WILDCARD_KEYS instead.
  *
  * Runs at document_start in the page's own world, before any page script, so
  * the built-ins it uses are still the real ones.
  */
-const RUNTIME = `
+const runtime = (wildcard: boolean) => `
   const has = Object.prototype.hasOwnProperty;
   const host = location.hostname;
   const chain = [];
@@ -155,8 +186,9 @@ const RUNTIME = `
   const except = new Set();
   for (const h of chain) if (has.call(X, h)) for (const k of X[h]) except.add(k);
   if (except.has('*')) return;
+${wildcard ? WILDCARD_KEYS : '  const keys = chain;'}
   const done = new Set();
-  for (const h of chain) {
+  for (const h of keys) {
     if (!has.call(H, h)) continue;
     for (const i of H[h]) {
       if (done.has(i)) continue;
@@ -215,14 +247,19 @@ async function main() {
         const [name, ...args] = call;
 
         const include: string[] = [];
+        const names: string[] = [];
         const not: string[] = [];
         for (const entry of adg[1].split(',').map((d) => d.trim()).filter(Boolean)) {
           if (entry.startsWith('~')) {
             const h = toHost(entry.slice(1));
             if (h) not.push(h);
           } else if (entry.startsWith('/')) regex += 1;
-          else if (entry.endsWith('.*')) wild += 1;
-          else {
+          else if (entry.endsWith('.*')) {
+            const base = entry.slice(0, -2).toLowerCase();
+            if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(base)) bad += 1;
+            else if (isOwnName(base)) own += 1;
+            else names.push(base);
+          } else {
             const h = toHost(entry);
             if (!h) bad += 1;
             else if (isOwnHost(h)) own += 1;
@@ -237,32 +274,39 @@ async function main() {
           }
           continue;
         }
-        if (!include.length || name === undefined) continue;
+        if (name === undefined) continue;
 
-        const id = `${list.name}\t${name}`;
-        let g = groups.get(id);
-        if (!g) {
-          g = { list: list.name, name, rules: [], ruleIndex: new Map(), hosts: new Map() };
-          groups.set(id, g);
-        }
-        const ruleKey = JSON.stringify([args, not]);
-        let idx = g.ruleIndex.get(ruleKey);
-        if (idx === undefined) {
-          idx = g.rules.length;
-          g.rules.push(not.length ? [args, not] : [args]);
-          g.ruleIndex.set(ruleKey, idx);
-        }
-        for (const h of new Set(include)) {
-          if (!g.hosts.has(h)) g.hosts.set(h, new Set());
-          g.hosts.get(h)!.add(idx);
-        }
-        compiledHere = true;
+        const add = (wildcard: boolean, keys: string[]) => {
+          if (!keys.length) return;
+          const id = `${list.name}\t${name}\t${wildcard}`;
+          let g = groups.get(id);
+          if (!g) {
+            g = { list: list.name, name, wildcard, rules: [], ruleIndex: new Map(), hosts: new Map() };
+            groups.set(id, g);
+          }
+          const ruleKey = JSON.stringify([args, not]);
+          let idx = g.ruleIndex.get(ruleKey);
+          if (idx === undefined) {
+            idx = g.rules.length;
+            g.rules.push(not.length ? [args, not] : [args]);
+            g.ruleIndex.set(ruleKey, idx);
+          }
+          for (const h of new Set(keys)) {
+            if (!g.hosts.has(h)) g.hosts.set(h, new Set());
+            g.hosts.get(h)!.add(idx);
+          }
+          compiledHere = true;
+        };
+        add(false, include);
+        add(true, names);
+        if (names.length) wild += 1;
       }
 
       if (isException) continue;
       if (compiledHere) c.compiled += 1;
-      else if (wild) c.wildcardOnly += 1;
-      else if (own) c.ownOnly += 1;
+      if (compiledHere && wild) c.wildcard += 1;
+      if (compiledHere) continue;
+      if (own) c.ownOnly += 1;
       else if (regex) c.regexOnly += 1;
       else c.badHostOnly += 1;
     }
@@ -271,6 +315,7 @@ async function main() {
   await rm(OUT_DIR, { recursive: true, force: true });
   const index: ListScriptlet[] = [];
   let bytes = 0;
+  let wildcardBytes = 0;
   let largest = { file: '', kb: 0 };
   // Names the converter accepts but the library has no code for. Left out and
   // counted like the rest, rather than failing the build over one library gap.
@@ -289,7 +334,7 @@ async function main() {
 
     const body = [
       `/* winnower, generated. Do not edit.`,
-      ` * list: ${g.list}, scriptlet: ${g.name}, ${g.rules.length} rules on ${hosts.length} hosts`,
+      ` * list: ${g.list}, scriptlet: ${g.name}, ${g.rules.length} rules on ${hosts.length} ${g.wildcard ? 'names, any ending' : 'hosts'}`,
       ` * @adguard/scriptlets ${SCRIPTLETS_VERSION} (GPL-3.0)`,
       ` * regenerate: npm run list-scriptlets`,
       ` */`,
@@ -301,16 +346,17 @@ async function main() {
       `  const R = ${JSON.stringify(g.rules)};`,
       `  const H = ${JSON.stringify(H)};`,
       `  const X = ${JSON.stringify(X)};`,
-      RUNTIME,
+      runtime(g.wildcard),
       `})();`,
       ``,
     ].join('\n');
 
-    const file = `scriptlets/lists/${g.list}/${g.name}.js`;
+    const file = `scriptlets/lists/${g.list}/${g.name}${g.wildcard ? '.any-ending' : ''}.js`;
     await mkdir(new URL(`scriptlets/lists/${g.list}/`, EXT_DIR), { recursive: true });
     await writeFile(new URL(file, EXT_DIR), body, 'utf8');
-    index.push({ list: g.list, name: g.name, file, hosts });
+    index.push({ list: g.list, name: g.name, file, hosts, ...(g.wildcard ? { wildcard: true } : {}) });
     bytes += body.length;
+    if (g.wildcard) wildcardBytes += body.length;
     const kb = Math.round(body.length / 1024);
     if (kb > largest.kb) largest = { file, kb };
   }
@@ -322,12 +368,14 @@ async function main() {
   console.log('');
   for (const [state, c] of Object.entries(counts)) {
     console.log(`  lists ${state === 'on' ? 'on by default ' : 'off by default'}  ${String(c.rules).padStart(5)} rules  ${String(c.compiled).padStart(5)} compiled`);
-    console.log(`      left out: ${c.wildcardOnly} wildcard-only, ${c.trusted} trusted-*, ${c.rejected} other rejected, ${c.ownOnly} own-group hosts only, ${c.regexOnly} regex only, ${c.badHostOnly} unusable hosts only`);
+    console.log(`      ${c.wildcard} of them on names with any ending`);
+    console.log(`      left out: ${c.trusted} trusted-*, ${c.rejected} other rejected, ${c.ownOnly} own-group hosts only, ${c.regexOnly} regex only, ${c.badHostOnly} unusable hosts only`);
     console.log(`      exceptions: ${c.exceptions}`);
   }
   if (noCode.length) console.log(`      no code in the library: ${noCode.join(', ')}`);
   console.log('');
   console.log(`  ${index.length} files, ${Math.round(bytes / 1024)} KB, largest ${largest.kb} KB (${largest.file})`);
+  console.log(`  any-ending files, loaded on every site: ${Math.round(wildcardBytes / 1024)} KB with every list on`);
 
   const compiled = counts.on.compiled + counts.off.compiled;
   if (compiled === 0 || index.length === 0) {

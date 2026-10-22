@@ -6,6 +6,13 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Site fixes for sites with many addresses:** some of the filter lists' site fixes are written
+  for a name under any ending, such as `example.*` for example.com, example.net and
+  example.co.uk. winnower skipped these until now. From the lists that are on by default, that is
+  about 630 more rules. Each list's fixes still follow its switch in winnower's menu.
+
 ## [0.5.1] - 2026-10-05
 
 ### Fixed

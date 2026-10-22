@@ -330,7 +330,7 @@ for (const s of listScriptlets) {
 }
 console.log(`  list scriptlets     ${listScriptlets.length} files, ${listHosts.toLocaleString()} host entries`);
 
-const aopr = listScriptlets.find((s) => s.list === 'ubo-filters' && s.name === 'ubo-aopr');
+const aopr = listScriptlets.find((s) => s.list === 'ubo-filters' && s.name === 'ubo-aopr' && !s.wildcard);
 if (!aopr) {
   problems.push('no ubo-aopr file for ubo-filters, so the list scriptlets cannot be checked running');
 } else {
@@ -375,6 +375,51 @@ if (!aopr) {
     for (const [label, got, want] of CASES) {
       console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  aopr ${prop}: ${label.padEnd(44)} ${got ? 'trapped' : 'open'}`);
       if (got !== want) problems.push(`the ubo-aopr list scriptlet is ${got ? 'trapped' : 'open'} on ${label}, expected ${want ? 'trapped' : 'open'}`);
+    }
+  }
+}
+
+// The any-ending file for the same scriptlet, which loads on every site and so
+// has to turn itself away everywhere else. Its table is keyed by the name
+// before `.*`, and the endings below are the ones that name must and must not
+// reach.
+const aoprAny = listScriptlets.find((s) => s.list === 'ubo-filters' && s.name === 'ubo-aopr' && s.wildcard);
+if (!aoprAny) {
+  problems.push('no any-ending ubo-aopr file for ubo-filters, so the any-ending rules cannot be checked running');
+} else {
+  const code = await readFile(new URL(aoprAny.file, EXT_DIR), 'utf8');
+  const table = (name: string) => JSON.parse(new RegExp(`const ${name} = (.*);\\n`).exec(code)?.[1] ?? 'null') as unknown;
+  const R = table('R') as Array<[string[], string[]?]>;
+  const H = table('H') as Record<string, number[]>;
+  const name = Object.keys(H).find((n) => !n.includes('.') && H[n].some((i) => !R[i][1] && /^[A-Za-z_$][\w$]*$/.test(R[i][0][0])));
+  if (!name) {
+    problems.push(`no name in ${aoprAny.file} traps a plain global, so the any-ending rules cannot be checked running`);
+  } else {
+    const prop = R[H[name].find((i) => !R[i][1] && /^[A-Za-z_$][\w$]*$/.test(R[i][0][0]))!][0][0];
+    const trapped = (hostname: string) => {
+      const win: Record<string, unknown> = {};
+      new Function('window', 'location', code)(win, { hostname });
+      try {
+        void win[prop];
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    const CASES: [string, boolean][] = [
+      [`${name}.com`, true],
+      [`${name}.lol`, true],
+      [`www.${name}.co.uk`, true],
+      [`${name}x.com, a longer name`, false],
+      [`x${name}.com, a longer name`, false],
+      [`${name}, no ending`, false],
+      [`${name}.a.b.c, three labels after it`, false],
+      ['example.org, not in the table', false],
+    ];
+    for (const [label, want] of CASES) {
+      const got = trapped(label.split(',')[0]);
+      console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  aopr any ending ${prop}: ${label.padEnd(38)} ${got ? 'trapped' : 'open'}`);
+      if (got !== want) problems.push(`the any-ending ubo-aopr list scriptlet is ${got ? 'trapped' : 'open'} on ${label}, expected ${want ? 'trapped' : 'open'}`);
     }
   }
 }

@@ -213,9 +213,11 @@ async function main() {
     // `*://*.host/*` matches the host itself as well as its subdomains, which
     // is what a list rule for that host means. The file checks the hostname
     // again before running anything, so a match here only decides what loads.
+    // Rules for any ending (`limetorrents.*`) have no pattern Chrome can
+    // express, so their files load everywhere and that check is the only one.
     ...listScriptlets.map((s): DynamicScript => ({
-      id: `winnower-lists-${s.list}-${s.name}`,
-      matches: s.hosts.map((h) => `*://*.${h}/*`),
+      id: `winnower-lists-${s.list}-${s.name}${s.wildcard ? '-any-ending' : ''}`,
+      matches: s.wildcard ? ['*://*/*'] : s.hosts.map((h) => `*://*.${h}/*`),
       js: [s.file],
       runAt: 'document_start',
       world: 'MAIN',
