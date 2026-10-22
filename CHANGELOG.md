@@ -17,6 +17,13 @@ All notable changes to winnower are documented here. The format follows
   of a page, such as rewriting text or setting cookies. winnower now runs them as uBlock does,
   using uBlock Origin's own code for them.
 
+### Changed
+
+- **Blocked count:** the number on winnower's toolbar icon now counts only requests that were
+  actually blocked. Before, a few requests that the lists' exception rules let through were
+  counted too. If you run another blocker alongside winnower, what it blocks is now counted as
+  well, because Chrome doesn't say which extension blocked a request.
+
 ### Fixed
 
 - **YouTube:** two of winnower's YouTube rules never ran, because of a mistake in how they were

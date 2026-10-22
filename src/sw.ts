@@ -412,26 +412,25 @@ function repaintBadges() {
   }).catch(() => {});
 }
 
-// onRuleMatchedDebug fires only for unpacked extensions, which is exactly how
-// winnower is installed. A packed build would need a different counter.
-if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
-  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
-    const tabId = info.request?.tabId;
-    if (typeof tabId !== 'number' || tabId < 0) return;
-    // This event fires for every matched rule, allow rules included, and does
-    // not report the action type. Without filtering, an allowlisted site would
-    // count its own allowlist rule as a "block". _dynamic is the allowlist;
-    // ubo-unbreak is almost entirely exception rules. Approximate, not exact:
-    // a handful of allow rules elsewhere can still be counted.
-    const rs = info.rule?.rulesetId;
-    if (rs === '_dynamic' || rs === 'ubo-unbreak') return;
-    const seen = blockedByTab.get(tabId) ?? new Set<string>();
-    blockedByTab.set(tabId, seen);
+// A request a block rule stops fails with ERR_BLOCKED_BY_CLIENT, and
+// webRequest reports that for every install, from the store or from the zip.
+// declarativeNetRequest.onRuleMatchedDebug looks like the obvious source but
+// fires only for unpacked installs, and for allow rules as well as blocks.
+// Observing
+// needs only the webRequest permission, not blocking webRequest, which MV3
+// does not allow. The error does not say which extension blocked the request,
+// so another blocker running beside winnower adds to the count.
+chrome.webRequest?.onErrorOccurred.addListener(
+  (details) => {
+    if (details.error !== 'net::ERR_BLOCKED_BY_CLIENT' || details.tabId < 0) return;
+    const seen = blockedByTab.get(details.tabId) ?? new Set<string>();
+    blockedByTab.set(details.tabId, seen);
     const before = seen.size;
-    seen.add(blockedAddress(info.request.url));
-    if (seen.size !== before) setBadge(tabId);
-  });
-}
+    seen.add(blockedAddress(details.url));
+    if (seen.size !== before) setBadge(details.tabId);
+  },
+  { urls: ['<all_urls>'] },
+);
 
 chrome.webNavigation?.onCommitted?.addListener((d) => {
   if (d.frameId !== 0) return;

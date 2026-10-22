@@ -37,7 +37,7 @@ const manifest = {
 
   permissions: [
     'declarativeNetRequest',
-    'declarativeNetRequestFeedback',
+    'webRequest', // sees which requests were blocked, for the blocked count; never changes them
     'scripting',
     'storage',
     'webNavigation', // resets the per-tab blocked counter on navigation

@@ -81,7 +81,6 @@ async function loadWorker(allowlist: string[], failStorage = false, probe?: Scri
         for (const id of enableRulesetIds) probe?.enabled.add(id);
         for (const id of disableRulesetIds) probe?.enabled.delete(id);
       },
-      onRuleMatchedDebug: noopEvent,
     },
     scripting: {
       getRegisteredContentScripts: async () => (probe?.registered ?? []).map((s) => ({ id: s.id })),
