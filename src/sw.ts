@@ -321,7 +321,24 @@ interface UpdateCheck {
 }
 
 /**
- * Ask GitHub for the newest release, at most once a day.
+ * Whether Chrome keeps winnower up to date by itself: installed from the
+ * Chrome Web Store ('normal'), or pushed by an administrator ('admin'). The
+ * release zip loads unpacked ('development'), and Chrome never updates that,
+ * which is the only reason the update check exists. Unknown counts as no, so
+ * a zip install never loses its notice.
+ */
+async function updatesItself(): Promise<boolean> {
+  try {
+    const { installType } = await chrome.management.getSelf();
+    return installType === 'normal' || installType === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ask GitHub for the newest release, at most once a day. Skipped entirely,
+ * with nothing sent, when Chrome updates winnower itself; see updatesItself.
  *
  * Runs when the worker starts, which is whenever winnower is doing anything,
  * rather than only when the menu is opened, so someone who never opens the menu
@@ -336,6 +353,7 @@ interface UpdateCheck {
  * connection makes one attempt a day rather than one per worker wake.
  */
 async function checkUpdate(force = false): Promise<{ latest: string; newer: boolean }> {
+  if (await updatesItself()) return { latest: '', newer: false };
   const current = chrome.runtime.getManifest().version;
   let state: UpdateCheck = { checkedAt: 0, latest: '' };
   try {
