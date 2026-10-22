@@ -6,6 +6,8 @@ All notable changes to winnower are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
 ### Added
 
 - **Site fixes for sites with many addresses:** some of the filter lists' site fixes are written
@@ -166,7 +168,8 @@ First release.
 - **Release zip:** loads with Load unpacked, with `CREDITS.txt` naming every filter list and the
   licence it declares.
 
-[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.6.0
 [0.5.1]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.5.1
 [0.5.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.5.0
 [0.4.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.4.0
