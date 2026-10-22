@@ -41,6 +41,8 @@ export interface ListScriptlet {
   hosts: string[];
   /** The rules name any ending (`limetorrents.*`), so the file loads on every site. */
   wildcard?: true;
+  /** uBlock runs some scriptlets in the extension's own world rather than the page's. */
+  world?: 'ISOLATED';
 }
 
 /** Per-list conversion stats, as recorded in rules/_stats.json. */

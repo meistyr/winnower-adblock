@@ -9,6 +9,7 @@ import { readFile, writeFile, access } from 'node:fs/promises';
 import { SCRIPTLETS_VERSION } from '@adguard/scriptlets';
 import { LISTS } from './lists.config.ts';
 import { SCRIPTLET_GROUPS } from './scriptlet-rules.ts';
+import { UBO_VERSION } from './ubo-scriptlets.ts';
 import type { DynamicScript, ListScriptlet, RulesetEntry } from '../src/shared/catalogue.ts';
 
 const EXT_DIR = new URL('../extension/', import.meta.url);
@@ -159,6 +160,8 @@ async function main() {
   credits.push(
     `Scriptlets: @adguard/scriptlets ${SCRIPTLETS_VERSION}, GPL-3.0`,
     '  https://github.com/AdguardTeam/Scriptlets',
+    `Scriptlets: uBlock Origin ${UBO_VERSION}, GPL-3.0, for the lists' trusted-* rules`,
+    '  https://github.com/gorhill/uBlock',
     '',
   );
   await writeFile(new URL('CREDITS.txt', EXT_DIR), credits.join('\n'), 'utf8');
@@ -220,7 +223,7 @@ async function main() {
       matches: s.wildcard ? ['*://*/*'] : s.hosts.map((h) => `*://*.${h}/*`),
       js: [s.file],
       runAt: 'document_start',
-      world: 'MAIN',
+      world: s.world ?? 'MAIN',
       allFrames: true,
       rulesets: [s.list],
     })),

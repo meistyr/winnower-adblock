@@ -14,10 +14,11 @@
  * it; it takes the process down. `agent: false` opens a fresh connection per
  * request and avoids the pooling path entirely.
  */
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, rm } from 'node:fs/promises';
 import https from 'node:https';
 import { createGunzip, createInflate, createBrotliDecompress } from 'node:zlib';
 import { LISTS, type FilterList } from './lists.config.ts';
+import { UBO_DIR, UBO_ENTRY, UBO_SOURCE, UBO_VERSION } from './ubo-scriptlets.ts';
 
 const OUT_DIR = new URL('../lists/', import.meta.url);
 const TIMEOUT_MS = 45_000;
@@ -100,6 +101,39 @@ async function fetchList({ name, url, tier }: FilterList) {
   return { name, tier, filters, bytes: Buffer.byteLength(text) };
 }
 
+/**
+ * uBlock Origin's scriptlet code at UBO_VERSION (see ubo-scriptlets.ts): the
+ * entry point and every module it imports, followed through relative imports,
+ * written under lists/ubo/js/ with uBlock's own layout so the imports resolve.
+ * Checked by loading it: a fetch that went wrong fails here, not in the build.
+ */
+async function fetchUbo(): Promise<{ files: number; scriptlets: number }> {
+  const todo = [UBO_ENTRY];
+  const done = new Set<string>();
+  while (todo.length) {
+    const path = todo.shift()!;
+    if (done.has(path)) continue;
+    done.add(path);
+    const text = await httpGet(new URL(path, UBO_SOURCE).href);
+    if (/^\s*<(?:!doctype|html)/i.test(text)) throw new Error(`${path}: got HTML, not JavaScript`);
+    const file = new URL(`js/${path}`, UBO_DIR);
+    await mkdir(new URL('.', file), { recursive: true });
+    await writeFile(file, text, 'utf8');
+    for (const [, spec] of text.matchAll(/^\s*(?:import|export)\b[^'"]*?from\s+['"](\.{1,2}\/[^'"]+)['"]/gm)) {
+      const next = new URL(spec, new URL(path, 'https://x/')).pathname.slice(1);
+      if (!done.has(next)) todo.push(next);
+    }
+    for (const [, spec] of text.matchAll(/^\s*import\s+['"](\.{1,2}\/[^'"]+)['"]/gm)) {
+      const next = new URL(spec, new URL(path, 'https://x/')).pathname.slice(1);
+      if (!done.has(next)) todo.push(next);
+    }
+  }
+  const mod = (await import(new URL(`js/${UBO_ENTRY}`, UBO_DIR).href)) as { builtinScriptlets?: unknown[] };
+  const scriptlets = mod.builtinScriptlets?.length ?? 0;
+  if (scriptlets < 100) throw new Error(`only ${scriptlets} scriptlets registered, expected well over 100`);
+  return { files: done.size, scriptlets };
+}
+
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
 
@@ -130,6 +164,14 @@ async function main() {
   console.log(`  ${pad('TOTAL', 22)} ${num(total.toLocaleString(), 9)}`);
   console.log('');
 
+  let ubo: Awaited<ReturnType<typeof fetchUbo>> | undefined;
+  try {
+    await rm(UBO_DIR, { recursive: true, force: true });
+    ubo = await fetchUbo();
+  } catch (err) {
+    failed.push({ name: `uBlock Origin ${UBO_VERSION} scriptlets`, reason: err instanceof Error ? err.message : String(err) });
+  }
+
   if (failed.length) {
     console.error('FAILED:');
     for (const f of failed) console.error(`  ${f.name}: ${f.reason}`);
@@ -137,6 +179,7 @@ async function main() {
     return;
   }
   console.log(`✓ ${ok.length}/${LISTS.length} lists fetched`);
+  console.log(`✓ uBlock Origin ${UBO_VERSION}: ${ubo!.files} files, ${ubo!.scriptlets} scriptlets`);
 }
 
 await main();

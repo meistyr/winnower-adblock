@@ -24,7 +24,9 @@
  * Left out, and counted below (tracked in issue #8):
  *   - hosts written as a regular expression. Chrome's match patterns cannot
  *     express them, and the files have no regex table.
- *   - rules the library's converter rejects, which includes every trusted-* rule.
+ *   - rules the library's converter rejects, except those uBlock runs only
+ *     from lists it trusts (every trusted-* rule, and aliases like rpnt).
+ *     Those run on uBlock's own code instead; see ubo-scriptlets.ts.
  *   - hosts with a hand-made group in scriptlet-rules.ts. Those sites keep that
  *     group alone.
  *
@@ -39,6 +41,7 @@ import { LISTS } from './lists.config.ts';
 import { SCRIPTLET_GROUPS } from './scriptlet-rules.ts';
 import { exceptionTable, type ScriptletException } from './scriptlet-exceptions.ts';
 import type { ListScriptlet } from '../src/shared/catalogue.ts';
+import { UBO_VERSION, loadUbo, parseUboArgs, uboScriptlet, type UboScriptlet } from './ubo-scriptlets.ts';
 
 const LISTS_DIR = new URL('../lists/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
@@ -122,6 +125,8 @@ interface Group {
   name: string;
   /** Keyed by the name before `.*` rather than by host. See WILDCARD_KEYS. */
   wildcard: boolean;
+  /** Set when the rules run on uBlock's code rather than the AdGuard library's. */
+  ubo?: UboScriptlet;
   /** [args] or [args, hosts it must not run on]. */
   rules: Array<[string[]] | [string[], string[]]>;
   ruleIndex: Map<string, number>;
@@ -202,6 +207,7 @@ ${wildcard ? WILDCARD_KEYS : '  const keys = chain;'}
 `;
 
 async function main() {
+  await loadUbo();
   const groups = new Map<string, Group>();
   /** host -> the exceptions found for it. Which files they reach is exceptionTable's call. */
   const exceptions = new Map<string, ScriptletException[]>();
@@ -227,20 +233,33 @@ async function main() {
       } catch {
         converted = [];
       }
-      if (!converted.length || !converted.every((r) => isValidScriptletRule(r))) {
-        if (!isException) {
-          if (ubo[3].trim().startsWith('trusted-')) c.trusted += 1;
-          else c.rejected += 1;
+
+      // The calls this line makes, each with the domain list it applies to.
+      const calls: Array<{ domains: string; call: string[] | null; ubo?: UboScriptlet }> = [];
+      if (converted.length && converted.every((r) => isValidScriptletRule(r))) {
+        for (const rule of converted) {
+          const adg = ADG_RULE.exec(rule);
+          calls.push({ domains: adg?.[1] ?? '', call: adg ? parseArgs(adg[3]) : null });
         }
-        continue;
+      } else {
+        // Rules uBlock runs only from lists it trusts, which every list these
+        // come from is: run on uBlock's own code. See ubo-scriptlets.ts.
+        const call = parseUboArgs(ubo[3]);
+        const code = call?.[0] ? uboScriptlet(call[0]) : undefined;
+        if (!call || !code?.requiresTrust) {
+          if (!isException) {
+            if (ubo[3].trim().startsWith('trusted-')) c.trusted += 1;
+            else c.rejected += 1;
+          }
+          continue;
+        }
+        calls.push({ domains: ubo[1], call: [code.name, ...call.slice(1)], ubo: code });
       }
 
       let compiledHere = false;
       let wild = 0, own = 0, regex = 0, bad = 0;
-      for (const rule of converted) {
-        const adg = ADG_RULE.exec(rule);
-        const call = adg ? parseArgs(adg[3]) : null;
-        if (!adg || !call) {
+      for (const { domains, call, ubo: code } of calls) {
+        if (!call) {
           bad += 1;
           continue;
         }
@@ -249,7 +268,7 @@ async function main() {
         const include: string[] = [];
         const names: string[] = [];
         const not: string[] = [];
-        for (const entry of adg[1].split(',').map((d) => d.trim()).filter(Boolean)) {
+        for (const entry of domains.split(',').map((d) => d.trim()).filter(Boolean)) {
           if (entry.startsWith('~')) {
             const h = toHost(entry.slice(1));
             if (h) not.push(h);
@@ -281,7 +300,7 @@ async function main() {
           const id = `${list.name}\t${name}\t${wildcard}`;
           let g = groups.get(id);
           if (!g) {
-            g = { list: list.name, name, wildcard, rules: [], ruleIndex: new Map(), hosts: new Map() };
+            g = { list: list.name, name, wildcard, ubo: code, rules: [], ruleIndex: new Map(), hosts: new Map() };
             groups.set(id, g);
           }
           const ruleKey = JSON.stringify([args, not]);
@@ -322,8 +341,8 @@ async function main() {
   const noCode: string[] = [];
 
   for (const g of groups.values()) {
-    const fn = scriptlets.getScriptletFunction(g.name);
-    if (typeof fn !== 'function') {
+    const fn = g.ubo ? undefined : scriptlets.getScriptletFunction(g.name);
+    if (!g.ubo && typeof fn !== 'function') {
       noCode.push(`${g.list}/${g.name} (${g.hosts.size} hosts)`);
       continue;
     }
@@ -332,17 +351,32 @@ async function main() {
     const H = Object.fromEntries(hosts.map((h) => [h, [...g.hosts.get(h)!]]));
     const X = exceptionTable(g, exceptions, onByDefault);
 
+    // uBlock's scriptlets take the rule's arguments directly, and reach their
+    // helpers by name and shared state through scriptletGlobals, all of which
+    // must be in scope. The library's take a source object first.
+    const code = g.ubo
+      ? [
+          `  const scriptletGlobals = {};`,
+          g.ubo.code,
+          `  const run = (_source, args) => ${g.ubo.fnName}(...args);`,
+          `  const NAME = ${JSON.stringify(g.name)};`,
+          `  const VERSION = ${JSON.stringify(UBO_VERSION)};`,
+        ]
+      : [
+          `  const run = ${String(fn)};`,
+          `  const NAME = ${JSON.stringify(g.name)};`,
+          `  const VERSION = ${JSON.stringify(SCRIPTLETS_VERSION)};`,
+        ];
+
     const body = [
       `/* winnower, generated. Do not edit.`,
       ` * list: ${g.list}, scriptlet: ${g.name}, ${g.rules.length} rules on ${hosts.length} ${g.wildcard ? 'names, any ending' : 'hosts'}`,
-      ` * @adguard/scriptlets ${SCRIPTLETS_VERSION} (GPL-3.0)`,
+      g.ubo ? ` * uBlock Origin ${UBO_VERSION} (GPL-3.0)` : ` * @adguard/scriptlets ${SCRIPTLETS_VERSION} (GPL-3.0)`,
       ` * regenerate: npm run list-scriptlets`,
       ` */`,
       `"use strict";`,
       `(() => {`,
-      `  const run = ${String(fn)};`,
-      `  const NAME = ${JSON.stringify(g.name)};`,
-      `  const VERSION = ${JSON.stringify(SCRIPTLETS_VERSION)};`,
+      ...code,
       `  const R = ${JSON.stringify(g.rules)};`,
       `  const H = ${JSON.stringify(H)};`,
       `  const X = ${JSON.stringify(X)};`,
@@ -354,7 +388,14 @@ async function main() {
     const file = `scriptlets/lists/${g.list}/${g.name}${g.wildcard ? '.any-ending' : ''}.js`;
     await mkdir(new URL(`scriptlets/lists/${g.list}/`, EXT_DIR), { recursive: true });
     await writeFile(new URL(file, EXT_DIR), body, 'utf8');
-    index.push({ list: g.list, name: g.name, file, hosts, ...(g.wildcard ? { wildcard: true } : {}) });
+    index.push({
+      list: g.list,
+      name: g.name,
+      file,
+      hosts,
+      ...(g.wildcard ? { wildcard: true } : {}),
+      ...(g.ubo?.world === 'ISOLATED' ? { world: 'ISOLATED' } : {}),
+    });
     bytes += body.length;
     if (g.wildcard) wildcardBytes += body.length;
     const kb = Math.round(body.length / 1024);

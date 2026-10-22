@@ -101,7 +101,9 @@ Copyright (C) 2026 meistyr.tech. GPL-3.0-or-later, see [LICENSE](LICENSE). winno
 no warranty.
 
 Uses [@adguard/scriptlets](https://github.com/AdguardTeam/Scriptlets) and
-[@adguard/dnr-converter](https://github.com/AdguardTeam/tsurlfilter), both GPL-3.0.
+[@adguard/dnr-converter](https://github.com/AdguardTeam/tsurlfilter), both GPL-3.0, and
+scriptlet code from [uBlock Origin](https://github.com/gorhill/uBlock), GPL-3.0, fetched at build
+time like the lists.
 
 The filter lists are not stored in this repository. They are fetched at build time, and a built
 extension or release zip contains rules converted from them, so it includes a `CREDITS.txt`

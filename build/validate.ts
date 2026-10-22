@@ -7,6 +7,7 @@
  * prints no errors is not evidence. This asserts positive facts instead.
  */
 import { readFile, readdir } from 'node:fs/promises';
+import vm from 'node:vm';
 import type { ListScriptlet, PopupPatterns } from '../src/shared/catalogue.ts';
 import { ALLOWLIST_PRIORITY, HID_MARKER, HIDE_DECLARATION } from '../src/shared/constants.ts';
 import { createPopupMatcher } from '../src/shared/popup-match.ts';
@@ -420,6 +421,49 @@ if (!aoprAny) {
       const got = trapped(label.split(',')[0]);
       console.log(`  ${got === want ? 'ok  ' : 'FAIL'}  aopr any ending ${prop}: ${label.padEnd(38)} ${got ? 'trapped' : 'open'}`);
       if (got !== want) problems.push(`the any-ending ubo-aopr list scriptlet is ${got ? 'trapped' : 'open'} on ${label}, expected ${want ? 'trapped' : 'open'}`);
+    }
+  }
+}
+console.log('');
+
+// A file running uBlock's own code (build/ubo-scriptlets.ts), run for real: its
+// helpers, scriptletGlobals and the call must all line up, and nothing short
+// of running it shows that. trusted-set-constant sets a value only the rule
+// names, read back the way the page would after defining the object. The
+// browser globals uBlock's helpers capture are stubbed, since Node has none.
+const uboSet = listScriptlets.find((s) => s.name === 'trusted-set-constant' && !s.wildcard);
+if (!uboSet) {
+  problems.push('no trusted-set-constant file, so uBlock-backed scriptlets cannot be checked running');
+} else {
+  const code = await readFile(new URL(uboSet.file, EXT_DIR), 'utf8');
+  const R = JSON.parse(/const R = (.*);\n/.exec(code)?.[1] ?? 'null') as Array<[string[], string[]?]>;
+  const H = JSON.parse(/const H = (.*);\n/.exec(code)?.[1] ?? 'null') as Record<string, number[]>;
+  const host = Object.keys(H).find((h) => /^[\w$]+(\.[\w$]+)+$/.test(R[H[h][0]][0][0]) && /^\{"value":/.test(R[H[h][0]][0][1].replace(/\s/g, '')));
+  if (!host) {
+    problems.push(`no rule in ${uboSet.file} sets a dotted chain to a JSON value, so it cannot be checked running`);
+  } else {
+    const [chain, raw] = R[H[host][0]][0];
+    const parts = chain.split('.');
+    const want = JSON.stringify((JSON.parse(raw) as { value: unknown }).value);
+    const valueOn = (hostname: string) => {
+      const ctx = vm.createContext({});
+      vm.runInContext('self = globalThis; window = globalThis; XMLHttpRequest = class {}; Request = class {}; fetch = () => {}; EventTarget = class {};', ctx);
+      ctx.location = { hostname };
+      ctx.document = { readyState: 'loading', addEventListener() {} };
+      vm.runInContext(code, ctx);
+      // The page defining the object the chain hangs off, one level short.
+      vm.runInContext(parts.slice(0, -1).map((_, i) => `window.${parts.slice(0, i + 1).join('.')} = window.${parts.slice(0, i + 1).join('.')} || {};`).join('\n'), ctx);
+      return vm.runInContext(`JSON.stringify(window.${chain})`, ctx) as string | undefined;
+    };
+    const CASES: [string, boolean][] = [
+      [host, true],
+      [`www.${host}`, true],
+      ['example.org', false],
+    ];
+    for (const [hostname, wantSet] of CASES) {
+      const got = valueOn(hostname) === want;
+      console.log(`  ${got === wantSet ? 'ok  ' : 'FAIL'}  uBlock trusted-set-constant ${chain}: ${hostname.padEnd(28)} ${got ? 'set' : 'untouched'}`);
+      if (got !== wantSet) problems.push(`the uBlock trusted-set-constant file left ${chain} ${got ? 'set' : 'untouched'} on ${hostname}, expected ${wantSet ? 'set' : 'untouched'}`);
     }
   }
 }
