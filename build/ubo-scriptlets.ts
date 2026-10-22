@@ -22,6 +22,8 @@ export const UBO_SOURCE = `https://raw.githubusercontent.com/gorhill/uBlock/${UB
 /** The entry point. Everything it imports, transitively, is fetched beside it. */
 export const UBO_ENTRY = 'resources/scriptlets.js';
 export const UBO_DIR = new URL('../lists/ubo/', import.meta.url);
+/** uBlock's own lists, the only ones uBlock runs requiresTrust scriptlets from. */
+export const UBO_LISTS = 'https://ublockorigin.github.io/uAssets/';
 
 interface Registered {
   name: string;

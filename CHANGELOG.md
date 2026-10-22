@@ -12,10 +12,10 @@ All notable changes to winnower are documented here. The format follows
   for a name under any ending, such as `example.*` for example.com, example.net and
   example.co.uk. winnower skipped these until now. From the lists that are on by default, that is
   about 630 more rules. Each list's fixes still follow its switch in winnower's menu.
-- **uBlock's trusted site fixes:** uBlock Origin's own lists include about 115 site fixes it only
-  runs from lists it trusts, because they can change more of a page, such as rewriting text or
-  setting cookies. winnower skipped them until now. It now runs them as uBlock does, using uBlock
-  Origin's own code for them.
+- **More of uBlock's site fixes:** about 140 site fixes in uBlock Origin's own lists did not run
+  in winnower. Most are ones uBlock only runs from lists it trusts, because they can change more
+  of a page, such as rewriting text or setting cookies. winnower now runs them as uBlock does,
+  using uBlock Origin's own code for them.
 
 ## [0.5.1] - 2026-10-05
 

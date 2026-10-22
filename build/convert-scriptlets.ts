@@ -24,9 +24,10 @@
  * Left out, and counted below (tracked in issue #8):
  *   - hosts written as a regular expression. Chrome's match patterns cannot
  *     express them, and the files have no regex table.
- *   - rules the library's converter rejects, except those uBlock runs only
- *     from lists it trusts (every trusted-* rule, and aliases like rpnt).
- *     Those run on uBlock's own code instead; see ubo-scriptlets.ts.
+ *   - rules the library's converter rejects and uBlock has no code for. The
+ *     rest run on uBlock's own code instead; see ubo-scriptlets.ts.
+ *   - rules uBlock runs only from lists it trusts (trusted-*, rpnt), when
+ *     they come from any list but uBlock's own.
  *   - hosts with a hand-made group in scriptlet-rules.ts. Those sites keep that
  *     group alone.
  *
@@ -41,7 +42,7 @@ import { LISTS } from './lists.config.ts';
 import { SCRIPTLET_GROUPS } from './scriptlet-rules.ts';
 import { exceptionTable, type ScriptletException } from './scriptlet-exceptions.ts';
 import type { ListScriptlet } from '../src/shared/catalogue.ts';
-import { UBO_VERSION, loadUbo, parseUboArgs, uboScriptlet, type UboScriptlet } from './ubo-scriptlets.ts';
+import { UBO_LISTS, UBO_VERSION, loadUbo, parseUboArgs, uboScriptlet, type UboScriptlet } from './ubo-scriptlets.ts';
 
 const LISTS_DIR = new URL('../lists/', import.meta.url);
 const EXT_DIR = new URL('../extension/', import.meta.url);
@@ -242,11 +243,13 @@ async function main() {
           calls.push({ domains: adg?.[1] ?? '', call: adg ? parseArgs(adg[3]) : null });
         }
       } else {
-        // Rules uBlock runs only from lists it trusts, which every list these
-        // come from is: run on uBlock's own code. See ubo-scriptlets.ts.
+        // Rules the library refuses run on uBlock's own code, as uBlock runs
+        // them. See ubo-scriptlets.ts. Those uBlock runs only from lists it
+        // trusts (trusted-*, rpnt) follow the same rule: uBlock's own lists only.
         const call = parseUboArgs(ubo[3]);
         const code = call?.[0] ? uboScriptlet(call[0]) : undefined;
-        if (!call || !code?.requiresTrust) {
+        const trustedList = list.url.startsWith(UBO_LISTS);
+        if (!call || !code || (code.requiresTrust && !trustedList)) {
           if (!isException) {
             if (ubo[3].trim().startsWith('trusted-')) c.trusted += 1;
             else c.rejected += 1;
