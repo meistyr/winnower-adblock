@@ -17,6 +17,11 @@ All notable changes to winnower are documented here. The format follows
   of a page, such as rewriting text or setting cookies. winnower now runs them as uBlock does,
   using uBlock Origin's own code for them.
 
+### Fixed
+
+- **YouTube:** two of winnower's YouTube rules never ran, because of a mistake in how they were
+  written. They remove ads from the videos you open after the first one. They now run.
+
 ## [0.5.1] - 2026-10-05
 
 ### Fixed

@@ -1,7 +1,10 @@
 /**
  * Scriptlet rules, per domain group.
  *
- * Names and argument shapes are AdGuard's (@adguard/scriptlets, GPL-3.0). A
+ * Names and argument shapes are AdGuard's (@adguard/scriptlets, GPL-3.0), not
+ * uBlock's. uBlock writes json-prune-fetch-response's URL as a pair,
+ * `propsToMatch, /player`; AdGuard takes the URL alone in that place, and the
+ * word propsToMatch there matches no request, so the rule never runs. A
  * maintained library is used rather than hand-written page scripts because
  * video players change often, and the library keeps up with those changes.
  *
@@ -54,7 +57,6 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
         args: [
           'reelWatchSequenceResponse.entries.[-].command.reelWatchEndpoint.adClientParams.isAd entries.[-].command.reelWatchEndpoint.adClientParams.isAd',
           '',
-          'propsToMatch',
           'reel_watch_sequence',
         ],
       },
@@ -68,7 +70,6 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
         args: [
           'adPlacements adSlots playerAds adBreakHeartbeatParams playerResponse.adPlacements playerResponse.adSlots playerResponse.playerAds',
           '',
-          'propsToMatch',
           '/youtubei/v1/player',
         ],
       },
@@ -105,7 +106,6 @@ export const SCRIPTLET_GROUPS: readonly ScriptletGroup[] = [
         args: [
           'adPlacements adSlots playerAds adBreakHeartbeatParams playerResponse.adPlacements playerResponse.adSlots playerResponse.playerAds',
           '',
-          'propsToMatch',
           '/youtubei/v1/player',
         ],
       },
