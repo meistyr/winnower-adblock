@@ -69,6 +69,9 @@ There is one branch, `main`. A release is:
 3. Commit that as `chore(release): X.Y.Z` and tag it `vX.Y.Z`.
 4. Push the commit and the tag together. The release workflow builds `winnower.zip` and
    publishes it on [Releases](https://github.com/meistyr/winnower-adblock/releases).
+5. Update the website: in its repository, run `npm run stats` against the published
+   `winnower.zip`. It refreshes the version and figures the site shows, and stops if the site's
+   copy of winnower's menu no longer matches the release.
 
 ## Changelog
 
