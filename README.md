@@ -95,7 +95,7 @@ whether to record when it starts.
 Nothing is sent anywhere either way. The recording is held for the browser session and thrown
 away when you close it.
 
-## Licence
+## License
 
 Copyright (C) 2026 meistyr.tech. GPL-3.0-or-later, see [LICENSE](LICENSE). winnower comes with
 no warranty.
@@ -107,14 +107,14 @@ time like the lists.
 
 The filter lists are not stored in this repository. They are fetched at build time, and a built
 extension or release zip contains rules converted from them, so it includes a `CREDITS.txt`
-naming each list with the homepage and licence declared in its own header. The lists remain
-under their own licences:
+naming each list with the homepage and license declared in its own header. The lists remain
+under their own licenses:
 
-| List | Maintainer | Licence |
+| List | Maintainer | License |
 |---|---|---|
 | uBlock filters, Badware risks, Quick fixes, Unbreak, Privacy | [uBlock Origin](https://github.com/uBlockOrigin/uAssets) | [GPL-3.0](https://github.com/uBlockOrigin/uAssets/blob/master/LICENSE) |
 | EasyList, EasyPrivacy | [EasyList](https://easylist.to/) | [EasyList licence](https://easylist.to/pages/licence.html) |
 | EasyList Cookie List, Fanboy's Annoyance List | [EasyList](https://easylist.to/) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| Ad and tracking server list | [Peter Lowe](https://pgl.yoyo.org/adservers/) | No licence stated; its site welcomes combining it with other lists |
+| Ad and tracking server list | [Peter Lowe](https://pgl.yoyo.org/adservers/) | No license stated; its site welcomes combining it with other lists |
 
 Not affiliated with YouTube, Google, Amazon or Netflix.

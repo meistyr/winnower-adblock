@@ -102,10 +102,10 @@ All notable changes to winnower are documented here. The format follows
 
 ### Fixed
 
-- **Twitch:** the video player no longer turns into a solid block of colour when you reload a
+- **Twitch:** the video player no longer turns into a solid block of color when you reload a
   channel page. winnower tidies away the empty boxes an ad leaves behind when it hides one, and
   it was counting boxes the site had emptied itself as its own work. On Twitch that meant
-  removing the space the player sits in, leaving the channel's background colour showing through
+  removing the space the player sits in, leaving the channel's background color showing through
   while the stream carried on playing with no picture. It now only tidies up after itself, which
   also fixes the same mistake on any other site that keeps its video player outside the part of
   the page it appears in.
@@ -166,7 +166,7 @@ First release.
   you're looking at.
 - **Toolbar icon:** follows Chrome's light or dark mode.
 - **Release zip:** loads with Load unpacked, with `CREDITS.txt` naming every filter list and the
-  licence it declares.
+  license it declares.
 
 [Unreleased]: https://github.com/meistyr/winnower-adblock/compare/v0.6.0...HEAD
 [0.6.0]: https://github.com/meistyr/winnower-adblock/releases/tag/v0.6.0
